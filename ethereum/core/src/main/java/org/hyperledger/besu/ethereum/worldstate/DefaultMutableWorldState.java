@@ -28,6 +28,7 @@ import org.hyperledger.besu.ethereum.rlp.RLP;
 import org.hyperledger.besu.ethereum.rlp.RLPException;
 import org.hyperledger.besu.ethereum.rlp.RLPInput;
 import org.hyperledger.besu.ethereum.trie.MerklePatriciaTrie;
+import org.hyperledger.besu.ethereum.trie.Node;
 import org.hyperledger.besu.ethereum.trie.StoredMerklePatriciaTrie;
 
 import java.util.ArrayList;
@@ -434,5 +435,23 @@ public class DefaultMutableWorldState implements MutableWorldState {
         wrapped.accountStateTrie.put(updated.getAddressHash(), account);
       }
     }
+  }
+
+  @Override
+  public Node<Bytes> getAccountStateTrieRoot() { return accountStateTrie.getRoot(); }
+
+  @Override
+  public Bytes getCodeFromHash(final Bytes32 codeHash) {
+    return worldStateStorage.getCode(codeHash).orElse(Bytes.EMPTY);
+  }
+
+  @Override
+  public Node<Bytes> getAccountStorageTrieRoot(final Bytes32 leafPath, final Bytes32 storageHash) {
+    return updatedStorageTries.entrySet()
+            .stream()
+            .filter(e -> Hash.hash(e.getKey()).equals(leafPath))
+            .map(e -> e.getValue().getRoot())
+            .findFirst()
+            .orElse(newAccountStorageTrie(storageHash).getRoot());
   }
 }

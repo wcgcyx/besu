@@ -14,6 +14,10 @@
  */
 package org.hyperledger.besu.ethereum.core;
 
+import org.apache.tuweni.bytes.Bytes;
+import org.apache.tuweni.bytes.Bytes32;
+import org.hyperledger.besu.ethereum.trie.Node;
+
 public interface MutableWorldState extends WorldState, MutableWorldView {
 
   /**
@@ -25,4 +29,10 @@ public interface MutableWorldState extends WorldState, MutableWorldView {
 
   /** Persist accumulated changes to underlying storage. */
   void persist();
+
+  default Node<Bytes> getAccountStateTrieRoot() { return null; }
+
+  default Bytes getCodeFromHash(final Bytes32 codeHash) { return null; }
+
+  default Node<Bytes> getAccountStorageTrieRoot(final Bytes32 leafPath, final Bytes32 storageHash) { return null; }
 }

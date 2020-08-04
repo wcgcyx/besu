@@ -124,4 +124,9 @@ class StoredNode<V> implements Node<V> {
       return load().print();
     }
   }
+
+  @Override
+  public Node<V> getLoaded() {
+    return loaded;
+  }
 }

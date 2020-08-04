@@ -65,4 +65,24 @@ public interface Node<V> {
 
   /** Unloads the node if it is, for example, a StoredNode. */
   default void unload() {}
+
+  default Node<V> getLoaded() { return null; }
+
+  default Bytes getBitMask() { return this instanceof StoredNode ? this.getLoaded().getBitMask() : null; }
+
+  default Bytes getExtensionPath() { return this instanceof StoredNode ? this.getLoaded().getExtensionPath() : null; }
+
+  default Bytes32 getLeafPath(final Bytes prvPath) { return this instanceof StoredNode ? this.getLoaded().getLeafPath(prvPath) : null; }
+
+  default boolean isHashNode() { return this instanceof StoredNode && this.getLoaded() == null; }
+
+  default boolean isBranchNode() { return (this instanceof StoredNode ? this.getLoaded() : this) instanceof BranchNode; }
+
+  default boolean isExtensionNode() { return (this instanceof StoredNode ? this.getLoaded() : this) instanceof ExtensionNode; }
+
+  default boolean isLeafNode() { return (this instanceof StoredNode ? this.getLoaded() : this) instanceof LeafNode; }
+
+  default boolean isNullNode() { return (this instanceof StoredNode ? this.getLoaded() : this) instanceof NullNode; }
+
+  default boolean isStoredNode() { return this instanceof StoredNode; }
 }

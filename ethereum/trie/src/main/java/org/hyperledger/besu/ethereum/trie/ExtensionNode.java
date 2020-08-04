@@ -148,4 +148,17 @@ class ExtensionNode<V> implements Node<V> {
   public void markDirty() {
     dirty = true;
   }
+
+  @Override
+  public Bytes getExtensionPath() {
+    Bytes res = Bytes.EMPTY;
+    int size = path.size();
+    for (int i = 0; i < size / 2; i++) {
+      res = Bytes.concatenate(res, Bytes.of(path.get(2 * i) << 4 | path.get(2 * i + 1)));
+    }
+    if (size % 2 == 1) {
+      res = Bytes.concatenate(res, Bytes.of(path.get(size - 1) << 4));
+    }
+    return res;
+  }
 }
