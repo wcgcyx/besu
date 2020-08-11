@@ -260,11 +260,12 @@ public abstract class AbstractBlockProcessor implements BlockProcessor {
       witness = Bytes.concatenate(witness,
               Bytes.of(0x00),
               node.getBitMask());
-      int i = 0;
-      for (Node<Bytes> child : node.getChildren()) {
+      List<Node<Bytes>> children = node.getChildren();
+      for (int i = 0; i < 16; i++) {
+        Node<Bytes> child = children.get(i);
         if (child.isNullNode()) continue;
         witness = Bytes.concatenate(witness,
-                generateStateTrieWitness(child, accessedPath, worldState, Bytes.concatenate(prvPath, Bytes.of(i++))));
+                generateStateTrieWitness(child, accessedPath, worldState, Bytes.concatenate(prvPath, Bytes.of(i))));
       }
     } else if (node.isExtensionNode()) {
       witness = Bytes.concatenate(witness,
@@ -318,11 +319,12 @@ public abstract class AbstractBlockProcessor implements BlockProcessor {
       witness = Bytes.concatenate(witness,
               Bytes.of(0x00),
               node.getBitMask());
-      int i = 0;
-      for (Node<Bytes> child : node.getChildren()) {
+      List<Node<Bytes>> children = node.getChildren();
+      for (int i = 0; i < 16; i++) {
+        Node<Bytes> child = children.get(i);
         if (child.isNullNode()) continue;
         witness = Bytes.concatenate(witness,
-                generateStorageTrieWitness(child, Bytes.concatenate(prvPath, Bytes.of(i++))));
+                generateStorageTrieWitness(child, Bytes.concatenate(prvPath, Bytes.of(i))));
       }
     } else if (node.isExtensionNode()) {
       witness = Bytes.concatenate(witness,
