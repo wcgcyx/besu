@@ -302,19 +302,10 @@ public abstract class AbstractBlockProcessor implements BlockProcessor {
   private Bytes generateStorageTrieWitness(final Node<Bytes> node, final Bytes prvPath) {
     Bytes witness = Bytes.EMPTY;
     if (node.isStoredNode() || node.isNullNode()) {
-      // This is a storage hash node.
-      Bytes rlp = node.getRlp();
-      Bytes hash = node.getHash();
-      if (rlp.size() < hash.size()) {
-        witness = Bytes.concatenate(witness,
-                Bytes.of(0x03),
-                Bytes.ofUnsignedShort(rlp.size()).trimLeadingZeros(),
-                rlp);
-      } else {
-        witness = Bytes.concatenate(witness,
-                hash.get(0) == 0 ? Bytes.of(0x00) : Bytes.EMPTY,
-                hash);
-      }
+      // This is a storage hash node or null node.
+      witness = Bytes.concatenate(witness,
+              Bytes.of(0x03),
+              node.getHash());
     } else if (node.isBranchNode()) {
       witness = Bytes.concatenate(witness,
               Bytes.of(0x00),
