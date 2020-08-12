@@ -307,7 +307,7 @@ public abstract class AbstractBlockProcessor implements BlockProcessor {
       Bytes hash = node.getHash();
       if (rlp.size() < hash.size()) {
         witness = Bytes.concatenate(witness,
-                Bytes.of(0x00),
+                Bytes.of(0x03),
                 Bytes.ofUnsignedShort(rlp.size()).trimLeadingZeros(),
                 rlp);
       } else {
