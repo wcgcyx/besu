@@ -14,6 +14,12 @@
  */
 package org.hyperledger.besu.ethereum.core;
 
+import org.apache.tuweni.bytes.Bytes;
+import org.apache.tuweni.bytes.Bytes32;
+import org.hyperledger.besu.ethereum.trie.MerklePatriciaTrie;
+
+import java.util.Map;
+
 public interface MutableWorldState extends WorldState, MutableWorldView {
 
   /**
@@ -25,4 +31,18 @@ public interface MutableWorldState extends WorldState, MutableWorldView {
 
   /** Persist accumulated changes to underlying storage. */
   void persist();
+
+  default void startTracking() {}
+
+  default Map<Bytes32, Bytes> getAccessedCode() { return null; }
+
+  default Map<Bytes32, MerklePatriciaTrie<Bytes32, Bytes>> getAccessedStorage() { return null; }
+
+  default void stopTracking() {}
+
+  default MerklePatriciaTrie<Bytes32, Bytes> getStorageTrieByHash(Bytes32 storageHash) { return null; }
+
+  default MerklePatriciaTrie<Bytes32, Bytes> getStateTrie() { return null; }
+
+  default Bytes getCodeFromHash(final Bytes32 codeHash) { return null; }
 }

@@ -18,6 +18,7 @@ import static org.hyperledger.besu.crypto.Hash.keccak256;
 
 import org.hyperledger.besu.ethereum.rlp.RLP;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -88,4 +89,8 @@ public interface MerklePatriciaTrie<K, V> {
   Map<Bytes32, V> entriesFrom(Bytes32 startKeyHash, int limit);
 
   void visitAll(Consumer<Node<V>> visitor);
+
+  default Node<V> getRoot() { return null; }
+
+  default List<Bytes32> getLoadedLeafPathList() { return null; }
 }

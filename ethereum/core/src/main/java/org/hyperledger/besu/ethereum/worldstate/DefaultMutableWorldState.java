@@ -55,6 +55,8 @@ public class DefaultMutableWorldState implements MutableWorldState {
   private final Map<Address, Bytes> updatedAccountCode = new HashMap<>();
   private final Map<Bytes32, UInt256> newStorageKeyPreimages = new HashMap<>();
   private final Map<Bytes32, Address> newAccountKeyPreimages = new HashMap<>();
+  private Map<Bytes32, Bytes> accessedCode = null;
+  private Map<Bytes32, MerklePatriciaTrie<Bytes32, Bytes>> accessedStorage = null;
 
   public DefaultMutableWorldState(
       final WorldStateStorage storage, final WorldStatePreimageStorage preimageStorage) {
@@ -90,8 +92,12 @@ public class DefaultMutableWorldState implements MutableWorldState {
   }
 
   private MerklePatriciaTrie<Bytes32, Bytes> newAccountStorageTrie(final Bytes32 rootHash) {
-    return new StoredMerklePatriciaTrie<>(
-        worldStateStorage::getAccountStorageTrieNode, rootHash, b -> b, b -> b);
+    MerklePatriciaTrie<Bytes32, Bytes> res = new StoredMerklePatriciaTrie<>(
+            worldStateStorage::getAccountStorageTrieNode, rootHash, b -> b, b -> b);
+    if (accessedStorage != null) {
+      accessedStorage.putIfAbsent(rootHash, res);
+    }
+    return res;
   }
 
   @Override
@@ -269,7 +275,11 @@ public class DefaultMutableWorldState implements MutableWorldState {
       if (codeHash.equals(Hash.EMPTY)) {
         return Bytes.EMPTY;
       }
-      return worldStateStorage.getCode(codeHash).orElse(Bytes.EMPTY);
+      Bytes res = worldStateStorage.getCode(codeHash).orElse(Bytes.EMPTY);
+      if (accessedCode != null) {
+        accessedCode.putIfAbsent(codeHash, res);
+      }
+      return res;
     }
 
     @Override
@@ -434,5 +444,40 @@ public class DefaultMutableWorldState implements MutableWorldState {
         wrapped.accountStateTrie.put(updated.getAddressHash(), account);
       }
     }
+  }
+
+  @Override
+  public void startTracking() {
+    accessedCode = new HashMap<>();
+    accessedStorage = new HashMap<>();
+  }
+
+  @Override
+  public Map<Bytes32, Bytes> getAccessedCode() {
+    return accessedCode;
+  }
+
+  @Override
+  public Map<Bytes32, MerklePatriciaTrie<Bytes32, Bytes>> getAccessedStorage() {
+    return accessedStorage;
+  }
+
+  @Override
+  public void stopTracking() {
+    accessedCode = null;
+    accessedStorage = null;
+  }
+
+  @Override
+  public MerklePatriciaTrie<Bytes32, Bytes> getStorageTrieByHash(Bytes32 storageHash) {
+    return newAccountStorageTrie(storageHash);
+  }
+
+  @Override
+  public MerklePatriciaTrie<Bytes32, Bytes> getStateTrie() { return accountStateTrie; }
+
+  @Override
+  public Bytes getCodeFromHash(final Bytes32 codeHash) {
+    return worldStateStorage.getCode(codeHash).orElse(Bytes.EMPTY);
   }
 }

@@ -17,6 +17,7 @@ package org.hyperledger.besu.ethereum.trie;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static org.hyperledger.besu.ethereum.trie.CompactEncoding.bytesToPath;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -137,5 +138,30 @@ public class StoredMerklePatriciaTrie<K extends Bytes, V> implements MerklePatri
   @Override
   public String toString() {
     return getClass().getSimpleName() + "[" + getRootHash() + "]";
+  }
+
+  @Override
+  public Node<V> getRoot() {
+    return root;
+  }
+
+  @Override
+  public List<Bytes32> getLoadedLeafPathList() {
+    return getLoadedLeafPathList(root, Bytes.EMPTY);
+  }
+
+  private List<Bytes32> getLoadedLeafPathList(final Node<V> node, final Bytes prvPath) {
+    List<Bytes32> res = new ArrayList<>();
+    if (node.isBranchNode()) {
+      List<Node<V>> children = node.getChildren();
+      for (int i = 0; i < 16; i++) {
+        res.addAll(getLoadedLeafPathList(children.get(i), Bytes.concatenate(prvPath, Bytes.of(i))));
+      }
+    } else if (node.isExtensionNode()) {
+      res.addAll(getLoadedLeafPathList(node.getChildren().get(0), Bytes.concatenate(prvPath, node.getPath())));
+    } else if (node.isLeafNode()) {
+      res.add(node.getLeafPath(prvPath));
+    }
+    return res;
   }
 }
