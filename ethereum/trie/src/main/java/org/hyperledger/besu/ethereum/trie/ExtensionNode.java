@@ -28,7 +28,7 @@ import java.util.Optional;
 import org.apache.tuweni.bytes.Bytes;
 import org.apache.tuweni.bytes.Bytes32;
 
-class ExtensionNode<V> implements Node<V> {
+public class ExtensionNode<V> implements Node<V> {
   private final Bytes path;
   private final Node<V> child;
   private final NodeFactory<V> nodeFactory;
@@ -36,7 +36,7 @@ class ExtensionNode<V> implements Node<V> {
   private SoftReference<Bytes32> hash;
   private boolean dirty = false;
 
-  ExtensionNode(final Bytes path, final Node<V> child, final NodeFactory<V> nodeFactory) {
+  public ExtensionNode(final Bytes path, final Node<V> child, final NodeFactory<V> nodeFactory) {
     assert (path.size() > 0);
     assert (path.get(path.size() - 1) != CompactEncoding.LEAF_TERMINATOR)
         : "Extension path ends in a leaf terminator";

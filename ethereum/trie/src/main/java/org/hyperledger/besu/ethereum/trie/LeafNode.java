@@ -29,7 +29,7 @@ import java.util.function.Function;
 import org.apache.tuweni.bytes.Bytes;
 import org.apache.tuweni.bytes.Bytes32;
 
-class LeafNode<V> implements Node<V> {
+public class LeafNode<V> implements Node<V> {
   private final Bytes path;
   private final V value;
   private final NodeFactory<V> nodeFactory;
@@ -38,11 +38,11 @@ class LeafNode<V> implements Node<V> {
   private SoftReference<Bytes32> hash;
   private boolean dirty = false;
 
-  LeafNode(
-      final Bytes path,
-      final V value,
-      final NodeFactory<V> nodeFactory,
-      final Function<V, Bytes> valueSerializer) {
+  public LeafNode(
+          final Bytes path,
+          final V value,
+          final NodeFactory<V> nodeFactory,
+          final Function<V, Bytes> valueSerializer) {
     this.path = path;
     this.value = value;
     this.nodeFactory = nodeFactory;

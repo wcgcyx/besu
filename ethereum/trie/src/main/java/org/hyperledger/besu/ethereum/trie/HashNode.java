@@ -14,32 +14,37 @@
  */
 package org.hyperledger.besu.ethereum.trie;
 
+import org.apache.tuweni.bytes.Bytes;
+import org.apache.tuweni.bytes.Bytes32;
+import org.hyperledger.besu.ethereum.rlp.RLP;
+
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
-import org.apache.tuweni.bytes.Bytes;
-import org.apache.tuweni.bytes.Bytes32;
+public class HashNode<V> implements Node<V> {
 
-public class NullNode<V> implements Node<V> {
-  @SuppressWarnings("rawtypes")
-  private static final NullNode instance = new NullNode();
+  private final Bytes32 hash;
+  private final Bytes rlp;
 
-  public NullNode() {}
+  public HashNode(final Bytes32 hash) {
+    this.hash = hash;
+    this.rlp = null;
+  }
 
-  @SuppressWarnings("unchecked")
-  static <V> NullNode<V> instance() {
-    return instance;
+  public HashNode(final Bytes rlp) {
+    this.hash = null;
+    this.rlp = rlp;
   }
 
   @Override
   public Node<V> accept(final PathNodeVisitor<V> visitor, final Bytes path) {
-    return visitor.visit(this, path);
+    return null;
   }
 
   @Override
   public void accept(final NodeVisitor<V> visitor) {
-    visitor.visit(this);
+    // do nothing
   }
 
   @Override
@@ -59,17 +64,17 @@ public class NullNode<V> implements Node<V> {
 
   @Override
   public Bytes getRlp() {
-    return MerklePatriciaTrie.EMPTY_TRIE_NODE;
+    return rlp == null ? RLP.encodeOne(getHash()) : rlp;
   }
 
   @Override
   public Bytes getRlpRef() {
-    return MerklePatriciaTrie.EMPTY_TRIE_NODE;
+    return rlp == null ? RLP.encodeOne(getHash()) : rlp;
   }
 
   @Override
   public Bytes32 getHash() {
-    return MerklePatriciaTrie.EMPTY_TRIE_NODE_HASH;
+    return hash;
   }
 
   @Override
@@ -79,7 +84,7 @@ public class NullNode<V> implements Node<V> {
 
   @Override
   public String print() {
-    return "[NULL]";
+    return "[Hash: " + hash.toHexString() + "]";
   }
 
   @Override

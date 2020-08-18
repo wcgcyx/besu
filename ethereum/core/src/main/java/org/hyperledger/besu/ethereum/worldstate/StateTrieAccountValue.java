@@ -29,8 +29,8 @@ public class StateTrieAccountValue {
   private final Hash codeHash;
   private final int version;
 
-  private StateTrieAccountValue(
-      final long nonce, final Wei balance, final Hash storageRoot, final Hash codeHash) {
+  public StateTrieAccountValue(
+          final long nonce, final Wei balance, final Hash storageRoot, final Hash codeHash) {
     this(nonce, balance, storageRoot, codeHash, Account.DEFAULT_VERSION);
   }
 

@@ -65,4 +65,6 @@ public interface Node<V> {
 
   /** Unloads the node if it is, for example, a StoredNode. */
   default void unload() {}
+
+  static Node<Bytes> newNullNode() { return NullNode.instance(); }
 }
