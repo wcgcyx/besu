@@ -236,13 +236,14 @@ public abstract class AbstractBlockProcessor implements BlockProcessor {
       Bytes32 codeHash = accountValue.getCodeHash();
       Bytes32 storageHash = accountValue.getStorageRoot();
       Bytes32 leafPath = node.getLeafPath(prvPath);
+      boolean isEOA = codeHash.equals(Hash.EMPTY) && storageHash.equals(Hash.EMPTY_TRIE_HASH);
       witness = Bytes.concatenate(witness,
               Bytes.of(0x02),
-              Bytes.of(codeHash.equals(Hash.EMPTY) ? 0x00 : 0x01),
+              Bytes.of(isEOA ? 0x00 : 0x01),
               leafPath,
               accountValue.getBalance().toBytes(),
               Bytes32.leftPad(Bytes.ofUnsignedLong(accountValue.getNonce())));
-      if (!codeHash.equals(Hash.EMPTY) || !storageHash.equals(Hash.EMPTY_TRIE_HASH)) {
+      if (!isEOA) {
         // Add code
         Bytes code = worldState.getCodeFromHash(codeHash);
         boolean codeAccessed = accessedCode.containsKey(codeHash);
