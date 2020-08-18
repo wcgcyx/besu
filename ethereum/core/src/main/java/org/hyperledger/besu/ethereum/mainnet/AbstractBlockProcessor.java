@@ -232,8 +232,9 @@ public abstract class AbstractBlockProcessor implements BlockProcessor {
               node.getExtensionPath(),
               generateStateTrieWitness(node.getChildren().get(0), worldState, accessedCode, accessedStorage, Bytes.concatenate(prvPath, node.getPath())));
     } else if (node.isLeafNode()) {
-      StateTrieAccountValue accountValue = StateTrieAccountValue.readFrom(RLP.input(node.getValue().get()));
+      StateTrieAccountValue accountValue = StateTrieAccountValue.readFrom(RLP. input(node.getValue().get()));
       Bytes32 codeHash = accountValue.getCodeHash();
+      Bytes32 storageHash = accountValue.getStorageRoot();
       Bytes32 leafPath = node.getLeafPath(prvPath);
       witness = Bytes.concatenate(witness,
               Bytes.of(0x02),
@@ -241,7 +242,7 @@ public abstract class AbstractBlockProcessor implements BlockProcessor {
               leafPath,
               accountValue.getBalance().toBytes(),
               Bytes32.leftPad(Bytes.ofUnsignedLong(accountValue.getNonce())));
-      if (!codeHash.equals(Hash.EMPTY)) {
+      if (!codeHash.equals(Hash.EMPTY) || !storageHash.equals(Hash.EMPTY_TRIE_HASH)) {
         // Add code
         Bytes code = worldState.getCodeFromHash(codeHash);
         boolean codeAccessed = accessedCode.containsKey(codeHash);
@@ -250,7 +251,6 @@ public abstract class AbstractBlockProcessor implements BlockProcessor {
                 Bytes.ofUnsignedInt(code.size()),
                 codeAccessed ? code : codeHash);
         // Add storage
-        Bytes32 storageHash = accountValue.getStorageRoot();
         boolean storageAccessed = accessedStorage.containsKey(storageHash);
         witness = Bytes.concatenate(witness,
                 storageAccessed ? generateStorageTrieWitness(accessedStorage.get(storageHash).getRoot(), Bytes.EMPTY) :
