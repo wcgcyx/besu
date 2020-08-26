@@ -17,10 +17,11 @@ package org.hyperledger.besu.ethereum.trie;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static org.hyperledger.besu.ethereum.trie.CompactEncoding.bytesToPath;
 
-import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -37,6 +38,7 @@ public class StoredMerklePatriciaTrie<K extends Bytes, V> implements MerklePatri
   private final GetVisitor<V> getVisitor = new GetVisitor<>();
   private final RemoveVisitor<V> removeVisitor = new RemoveVisitor<>();
   private final StoredNodeFactory<V> nodeFactory;
+  private final Set<K> removedLeaves = new HashSet<>();
 
   private Node<V> root;
 
@@ -101,6 +103,7 @@ public class StoredMerklePatriciaTrie<K extends Bytes, V> implements MerklePatri
   @Override
   public void remove(final K key) {
     checkNotNull(key);
+    removedLeaves.add(key);
     this.root = root.accept(removeVisitor, bytesToPath(key));
   }
 
@@ -146,19 +149,24 @@ public class StoredMerklePatriciaTrie<K extends Bytes, V> implements MerklePatri
   }
 
   @Override
-  public List<Bytes32> getLoadedLeafPathList() {
-    return getLoadedLeafPathList(root, Bytes.EMPTY);
+  public Set<K> getRemovedLeaves() {
+    return removedLeaves;
   }
 
-  private List<Bytes32> getLoadedLeafPathList(final Node<V> node, final Bytes prvPath) {
-    List<Bytes32> res = new ArrayList<>();
+  @Override
+  public Set<Bytes32> getLoadedLeaves() {
+    return getLoadedLeaves(root, Bytes.EMPTY);
+  }
+
+  private Set<Bytes32> getLoadedLeaves(final Node<V> node, final Bytes prvPath) {
+    Set<Bytes32> res = new HashSet<>();
     if (node.isBranchNode()) {
       List<Node<V>> children = node.getChildren();
       for (int i = 0; i < 16; i++) {
-        res.addAll(getLoadedLeafPathList(children.get(i), Bytes.concatenate(prvPath, Bytes.of(i))));
+        res.addAll(getLoadedLeaves(children.get(i), Bytes.concatenate(prvPath, Bytes.of(i))));
       }
     } else if (node.isExtensionNode()) {
-      res.addAll(getLoadedLeafPathList(node.getChildren().get(0), Bytes.concatenate(prvPath, node.getPath())));
+      res.addAll(getLoadedLeaves(node.getChildren().get(0), Bytes.concatenate(prvPath, node.getPath())));
     } else if (node.isLeafNode()) {
       res.add(node.getLeafPath(prvPath));
     }

@@ -18,9 +18,9 @@ import static org.hyperledger.besu.crypto.Hash.keccak256;
 
 import org.hyperledger.besu.ethereum.rlp.RLP;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 
 import org.apache.tuweni.bytes.Bytes;
@@ -92,5 +92,7 @@ public interface MerklePatriciaTrie<K, V> {
 
   default Node<V> getRoot() { return null; }
 
-  default List<Bytes32> getLoadedLeafPathList() { return null; }
+  default Set<K> getRemovedLeaves() { return null; }
+
+  default Set<Bytes32> getLoadedLeaves() { return null; }
 }

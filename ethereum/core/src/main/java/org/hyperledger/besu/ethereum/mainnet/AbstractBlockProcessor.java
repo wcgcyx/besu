@@ -35,6 +35,7 @@ import org.hyperledger.besu.ethereum.vm.BlockHashLookup;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.google.common.collect.ImmutableList;
 import org.apache.logging.log4j.LogManager;
@@ -182,9 +183,13 @@ public abstract class AbstractBlockProcessor implements BlockProcessor {
       if (storageTrie.getRootHash() != storageHash) {
         // It has been updated during execution.
         MerklePatriciaTrie<Bytes32, Bytes> originalStorageTrie = worldState.getStorageTrieByHash(storageHash);
-        List<Bytes32> loadedLeafPathList = storageTrie.getLoadedLeafPathList();
         // Try to load every leaf to the original storage trie.
+        Set<Bytes32> loadedLeafPathList = storageTrie.getLoadedLeaves();
         for (Bytes32 leaf : loadedLeafPathList) {
+          originalStorageTrie.get(leaf);
+        }
+        Set<Bytes32> removedLeaves = storageTrie.getRemovedLeaves();
+        for (Bytes32 leaf : removedLeaves) {
           originalStorageTrie.get(leaf);
         }
         // Now replace with the loaded original storage trie.
@@ -194,8 +199,12 @@ public abstract class AbstractBlockProcessor implements BlockProcessor {
 
     // Try to load every leaf to original state trie
     MerklePatriciaTrie<Bytes32, Bytes> originalStateTrie = initialWorldState.getStateTrie();
-    List<Bytes32> loadedLeafPathList = worldState.getStateTrie().getLoadedLeafPathList();
-    for (Bytes32 leaf : loadedLeafPathList) {
+    Set<Bytes32> loadedLeaves = worldState.getStateTrie().getLoadedLeaves();
+    for (Bytes32 leaf : loadedLeaves) {
+      originalStateTrie.get(leaf);
+    }
+    Set<Bytes32> removedLeaves = worldState.getStateTrie().getRemovedLeaves();
+    for (Bytes32 leaf : removedLeaves) {
       originalStateTrie.get(leaf);
     }
 
