@@ -14,9 +14,12 @@
  */
 package org.hyperledger.besu.ethereum.mainnet;
 
+import org.apache.tuweni.bytes.Bytes;
+import org.apache.tuweni.bytes.Bytes32;
 import org.hyperledger.besu.ethereum.chain.Blockchain;
 import org.hyperledger.besu.ethereum.core.Address;
 import org.hyperledger.besu.ethereum.core.BlockHeader;
+import org.hyperledger.besu.ethereum.core.Hash;
 import org.hyperledger.besu.ethereum.core.MutableWorldState;
 import org.hyperledger.besu.ethereum.core.Transaction;
 import org.hyperledger.besu.ethereum.core.TransactionReceipt;
@@ -24,14 +27,24 @@ import org.hyperledger.besu.ethereum.core.Wei;
 import org.hyperledger.besu.ethereum.core.WorldState;
 import org.hyperledger.besu.ethereum.core.WorldUpdater;
 import org.hyperledger.besu.ethereum.core.fees.TransactionGasBudgetCalculator;
+import org.hyperledger.besu.ethereum.rlp.RLP;
+import org.hyperledger.besu.ethereum.trie.MerklePatriciaTrie;
+import org.hyperledger.besu.ethereum.trie.Node;
+import org.hyperledger.besu.ethereum.trie.StoredMerklePatriciaTrie;
+import org.hyperledger.besu.ethereum.trie.WitnessTracking;
 import org.hyperledger.besu.ethereum.vm.BlockHashLookup;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import com.google.common.collect.ImmutableList;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.hyperledger.besu.ethereum.worldstate.StateTrieAccountValue;
+import org.hyperledger.besu.ethereum.worldstate.WorldStateStorage;
 
 public abstract class AbstractBlockProcessor implements BlockProcessor {
   @FunctionalInterface
@@ -114,6 +127,12 @@ public abstract class AbstractBlockProcessor implements BlockProcessor {
       final List<Transaction> transactions,
       final List<BlockHeader> ommers) {
 
+    // Get a copy of the initial world state
+    MutableWorldState initialWorldState = worldState.copy();
+
+    // Start tracking
+    WitnessTracking.startTracking();
+
     long gasUsed = 0;
     final List<TransactionReceipt> receipts = new ArrayList<>();
 
@@ -157,8 +176,147 @@ public abstract class AbstractBlockProcessor implements BlockProcessor {
       return AbstractBlockProcessor.Result.failed();
     }
 
+    // Obtain tracking result
+    Set<Bytes32> loadedNodes = WitnessTracking.getLoadedNodes();
+    Set<Bytes32> loadedCode = WitnessTracking.getLoadedCode();
+    Set<Bytes32> loadedStorage = WitnessTracking.getLoadedStorage();
+    // TODO: It is possible for different tries loading a same node.
+    //  Thus a same node could be loaded several times in a block, but it should be rare.
+    //  It maybe interesting to see how often this happens.
+
+    // Process initial state trie
+    Node<Bytes> root = initialWorldState.getAccountStateTrie().getRoot();
+    loadFromNode(root, loadedNodes);
+
+    // Process code and storage trie
+    WorldStateStorage worldStateStorage = initialWorldState.getWorldStateStorage();
+
+    Map<Bytes32, Bytes> accessedCode = new HashMap<>();
+    for (Bytes32 hash : loadedCode) {
+      accessedCode.put(hash, worldStateStorage.getCode(hash).orElse(Bytes.EMPTY));
+    }
+
+    Map<Bytes32, MerklePatriciaTrie<Bytes32, Bytes>> accessedStorage = new HashMap<>();
+    for (Bytes32 hash : loadedStorage) {
+      MerklePatriciaTrie<Bytes32, Bytes> storageTrie = new StoredMerklePatriciaTrie<>(
+              worldStateStorage::getAccountStateTrieNode, hash, b -> b, b -> b);
+      loadFromNode(storageTrie.getRoot(), loadedNodes);
+      accessedStorage.put(hash, storageTrie);
+    }
+
+    // Generate witness
+    Bytes witness = Bytes.concatenate(Bytes.of(0x01, 0x00), generateStateTrieWitness(root, worldStateStorage, accessedCode, accessedStorage, Bytes.EMPTY));
+    // Currently only log the witness size
+    LOG.info("Witness: " + witness.size());
+
     worldState.persist();
     return AbstractBlockProcessor.Result.successful(receipts);
+  }
+
+  private static void loadFromNode(Node<Bytes> node, Set<Bytes32> loadedNodes) {
+    if (node.isHashNode()) {
+      Bytes32 hash = node.getHash();
+      if (loadedNodes.contains(hash)) {
+        node.load();
+        for (Node<Bytes> child : node.getChildren()) {
+          loadFromNode(child, loadedNodes);
+        }
+      }
+    }
+  }
+
+  private static Bytes generateStateTrieWitness(final Node<Bytes> node, WorldStateStorage worldStateStorage, Map<Bytes32, Bytes> accessedCode, Map<Bytes32, MerklePatriciaTrie<Bytes32, Bytes>> accessedStorage, Bytes prvPath) {
+    Bytes witness = Bytes.EMPTY;
+    if (node.isHashNode()) {
+      witness = Bytes.concatenate(witness,
+              Bytes.of(0x03),
+              node.getHash());
+    } else if (node.isBranchNode()) {
+      witness = Bytes.concatenate(witness,
+              Bytes.of(0x00),
+              node.getBitMask());
+      List<Node<Bytes>> children = node.getChildren();
+      for (int i = 0; i < 16; i++) {
+        Node<Bytes> child = children.get(i);
+        if (child.isNullNode()) continue;
+        witness = Bytes.concatenate(witness,
+                generateStateTrieWitness(child, worldStateStorage, accessedCode, accessedStorage, Bytes.concatenate(prvPath, Bytes.of(i))));
+      }
+    } else if (node.isExtensionNode()) {
+      witness = Bytes.concatenate(witness,
+              Bytes.of(0x01),
+              Bytes.of(node.getPath().size()),
+              node.getExtensionPath(),
+              generateStateTrieWitness(node.getChildren().get(0), worldStateStorage, accessedCode, accessedStorage, Bytes.concatenate(prvPath, node.getPath())));
+    } else if (node.isLeafNode()) {
+      // TODO: Currently, it uses full leaf path rather than account address.
+      StateTrieAccountValue accountValue = StateTrieAccountValue.readFrom(RLP. input(node.getValue().get()));
+      Bytes32 codeHash = accountValue.getCodeHash();
+      Bytes32 storageHash = accountValue.getStorageRoot();
+      Bytes32 leafPath = node.getLeafPath(prvPath);
+      boolean isEOA = codeHash.equals(Hash.EMPTY) && storageHash.equals(Hash.EMPTY_TRIE_HASH);
+      witness = Bytes.concatenate(witness,
+              Bytes.of(0x02),
+              Bytes.of(isEOA ? 0x00 : 0x01),
+              leafPath,
+              accountValue.getBalance().toBytes(),
+              Bytes32.leftPad(Bytes.ofUnsignedLong(accountValue.getNonce())));
+      if (!isEOA) {
+        // Add code
+        Bytes code = worldStateStorage.getCode(codeHash).orElse(Bytes.EMPTY);
+        boolean codeAccessed = accessedCode.containsKey(codeHash);
+        witness = Bytes.concatenate(witness,
+                Bytes.of(codeAccessed ? 0x00 : 0x01),
+                Bytes.ofUnsignedInt(code.size()),
+                codeAccessed ? code : codeHash);
+        // Add storage
+        boolean storageAccessed = accessedStorage.containsKey(storageHash);
+        witness = Bytes.concatenate(witness,
+                storageAccessed ? generateStorageTrieWitness(accessedStorage.get(storageHash).getRoot(), Bytes.EMPTY) :
+                        Bytes.concatenate(Bytes.of(0x03), storageHash));
+      }
+    } else {
+      // This should never happen
+      LOG.error("State trie error with node: " + node.getRlp());
+    }
+    return witness;
+  }
+
+  private static Bytes generateStorageTrieWitness(final Node<Bytes> node, final Bytes prvPath) {
+    Bytes witness = Bytes.EMPTY;
+    if (node.isHashNode() || node.isNullNode()) {
+      // This is a storage hash node or null node
+      // TODO: Currently, it does not care for RLP
+      witness = Bytes.concatenate(witness,
+              Bytes.of(0x03),
+              node.getHash());
+    } else if (node.isBranchNode()) {
+      witness = Bytes.concatenate(witness,
+              Bytes.of(0x00),
+              node.getBitMask());
+      List<Node<Bytes>> children = node.getChildren();
+      for (int i = 0; i < 16; i++) {
+        Node<Bytes> child = children.get(i);
+        if (child.isNullNode()) continue;
+        witness = Bytes.concatenate(witness,
+                generateStorageTrieWitness(child, Bytes.concatenate(prvPath, Bytes.of(i))));
+      }
+    } else if (node.isExtensionNode()) {
+      witness = Bytes.concatenate(witness,
+              Bytes.of(0x01),
+              Bytes.of(node.getPath().size()),
+              node.getExtensionPath(),
+              generateStorageTrieWitness(node.getChildren().get(0), Bytes.concatenate(prvPath, node.getPath())));
+    } else if (node.isLeafNode()) {
+      witness = Bytes.concatenate(witness,
+              Bytes.of(0x02),
+              node.getLeafPath(prvPath),
+              RLP.input(node.getValue().get()).readUInt256Scalar().toBytes());
+    } else {
+      // This should never happen
+      LOG.error("Storage trie error with node: " + node.getRlp());
+    }
+    return witness;
   }
 
   protected MiningBeneficiaryCalculator getMiningBeneficiaryCalculator() {

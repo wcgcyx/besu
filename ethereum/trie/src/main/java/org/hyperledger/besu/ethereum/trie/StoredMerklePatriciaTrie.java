@@ -138,4 +138,9 @@ public class StoredMerklePatriciaTrie<K extends Bytes, V> implements MerklePatri
   public String toString() {
     return getClass().getSimpleName() + "[" + getRootHash() + "]";
   }
+
+  @Override
+  public Node<V> getRoot() {
+    return root;
+  }
 }

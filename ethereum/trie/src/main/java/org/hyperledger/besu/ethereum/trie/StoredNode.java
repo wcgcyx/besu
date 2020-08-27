@@ -99,8 +99,11 @@ class StoredNode<V> implements Node<V> {
     return load().replacePath(path);
   }
 
-  private Node<V> load() {
+  @Override
+  public Node<V> load() {
     if (loaded == null) {
+      // Add to loaded node list
+      WitnessTracking.addLoadedNode(hash);
       loaded =
           nodeFactory
               .retrieve(hash)
@@ -123,5 +126,10 @@ class StoredNode<V> implements Node<V> {
     } else {
       return load().print();
     }
+  }
+
+  @Override
+  public Node<V> getLoaded() {
+    return loaded;
   }
 }
