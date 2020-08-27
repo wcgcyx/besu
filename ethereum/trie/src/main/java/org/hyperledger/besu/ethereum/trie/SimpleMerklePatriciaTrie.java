@@ -49,6 +49,11 @@ public class SimpleMerklePatriciaTrie<K extends Bytes, V> implements MerklePatri
     this.root = NullNode.instance();
   }
 
+  public SimpleMerklePatriciaTrie(final Function<V, Bytes> valueSerializer, Node<V> root) {
+    this.nodeFactory = new DefaultNodeFactory<>(valueSerializer);
+    this.root = root;
+  }
+
   @Override
   public Optional<V> get(final K key) {
     checkNotNull(key);

@@ -29,24 +29,28 @@ import org.hyperledger.besu.ethereum.core.WorldUpdater;
 import org.hyperledger.besu.ethereum.core.fees.TransactionGasBudgetCalculator;
 import org.hyperledger.besu.ethereum.rlp.RLP;
 import org.hyperledger.besu.ethereum.trie.BranchNode;
+import org.hyperledger.besu.ethereum.trie.DefaultNodeFactory;
 import org.hyperledger.besu.ethereum.trie.ExtensionNode;
 import org.hyperledger.besu.ethereum.trie.HashNode;
 import org.hyperledger.besu.ethereum.trie.LeafNode;
+import org.hyperledger.besu.ethereum.trie.MerklePatriciaTrie;
 import org.hyperledger.besu.ethereum.trie.NullNode;
 import org.hyperledger.besu.ethereum.trie.Node;
+import org.hyperledger.besu.ethereum.trie.SimpleMerklePatriciaTrie;
 import org.hyperledger.besu.ethereum.vm.BlockHashLookup;
 
-import java.io.BufferedReader;
-import java.io.FileReader;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import com.google.common.collect.ImmutableList;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.hyperledger.besu.ethereum.worldstate.InMemoryMutableWorldState;
 import org.hyperledger.besu.ethereum.worldstate.StateTrieAccountValue;
 
 public abstract class AbstractBlockProcessor implements BlockProcessor {
@@ -130,9 +134,9 @@ public abstract class AbstractBlockProcessor implements BlockProcessor {
       final List<Transaction> transactions,
       final List<BlockHeader> ommers) {
 
-    // To re-construct state trie from witness.
-    // Bytes witness = Bytes.EMPTY;
-    // Pair<Node<Bytes>, Integer> res = getStateTrieNode(witness, 2, Bytes.EMPTY);
+    // Get witness and consume witness
+//    Bytes witness = Bytes.EMPTY;
+//    MutableWorldState witnessState = consumeWitness(blockchain, witness, blockHeader, transactions, ommers);
 
     long gasUsed = 0;
     final List<TransactionReceipt> receipts = new ArrayList<>();
@@ -192,7 +196,70 @@ public abstract class AbstractBlockProcessor implements BlockProcessor {
     }
   }
 
-  private Pair<Node<Bytes>, Integer> getStateTrieNode(final Bytes witness, final int startingIndex, Bytes prvPath) {
+  private MutableWorldState consumeWitness(
+          Blockchain blockchain,
+          Bytes witness,
+          BlockHeader blockHeader,
+          List<Transaction> transactions,
+          List<BlockHeader> ommers) {
+    Map<Bytes32, Bytes> accessedCode = new HashMap<>();
+    Map<Bytes32, MerklePatriciaTrie<Bytes32, Bytes>> accessedStorage = new HashMap<>();
+    Pair<Node<Bytes>, Integer> res = getStateTrieNode(witness, 2, Bytes.EMPTY, accessedCode, accessedStorage);
+    MutableWorldState worldState = new InMemoryMutableWorldState(new SimpleMerklePatriciaTrie<>(b -> b, res.l), accessedCode, accessedStorage);
+
+    long gasUsed = 0;
+
+    // Receipts are not returned here.
+    final List<TransactionReceipt> receipts = new ArrayList<>();
+
+    for (final Transaction transaction : transactions) {
+      final long remainingGasBudget = blockHeader.getGasLimit() - gasUsed;
+      if (!gasBudgetCalculator.hasBudget(transaction, blockHeader, gasUsed)) {
+        LOG.warn(
+                "Transaction processing error: transaction gas limit {} exceeds available block budget remaining {}",
+                transaction.getGasLimit(),
+                remainingGasBudget);
+        return null;
+      }
+
+      final WorldUpdater worldStateUpdater = worldState.updater();
+      final BlockHashLookup blockHashLookup = new BlockHashLookup(blockHeader, blockchain);
+      final Address miningBeneficiary =
+              miningBeneficiaryCalculator.calculateBeneficiary(blockHeader);
+
+      final TransactionProcessor.Result result =
+              transactionProcessor.processTransaction(
+                      blockchain,
+                      worldStateUpdater,
+                      blockHeader,
+                      transaction,
+                      miningBeneficiary,
+                      blockHashLookup,
+                      true,
+                      TransactionValidationParams.processingBlock());
+      if (result.isInvalid()) {
+        return null;
+      }
+
+      worldStateUpdater.commit();
+      gasUsed = transaction.getGasLimit() - result.getGasRemaining() + gasUsed;
+      final TransactionReceipt transactionReceipt =
+              transactionReceiptFactory.create(result, worldState, gasUsed);
+      receipts.add(transactionReceipt);
+    }
+
+    if (!rewardCoinbase(worldState, blockHeader, ommers, skipZeroBlockRewards)) {
+      return null;
+    }
+
+    // Persist does nothing.
+    worldState.persist();
+
+    return worldState;
+  }
+
+  private Pair<Node<Bytes>, Integer> getStateTrieNode(final Bytes witness, final int startingIndex, Bytes prvPath,
+                                                      final Map<Bytes32, Bytes> accessedCode, final Map<Bytes32, MerklePatriciaTrie<Bytes32, Bytes>> accessedStorage) {
     Node<Bytes> node = null;
     int pointer = startingIndex;
     byte nodeID = witness.get(pointer);
@@ -206,12 +273,12 @@ public abstract class AbstractBlockProcessor implements BlockProcessor {
         if (bitmask.and(i < 8 ? Bytes.of(0x01 << (7 - i), 0x00) : Bytes.of(0x00, 0x01 << (15 - i))).isZero()) {
           children.add(Node.newNullNode());
         } else {
-          Pair<Node<Bytes>, Integer> res = getStateTrieNode(witness, pointer, Bytes.concatenate(prvPath, Bytes.of(i)));
+          Pair<Node<Bytes>, Integer> res = getStateTrieNode(witness, pointer, Bytes.concatenate(prvPath, Bytes.of(i)), accessedCode, accessedStorage);
           children.add(res.l);
           pointer = res.r;
         }
       }
-      node = new BranchNode<>(children, Optional.empty(), null, null);
+      node = new BranchNode<>(children, Optional.empty(), new DefaultNodeFactory<>(b -> b), b -> b);
     } else if (nodeID == 0x01) {
       //This is a extension node
       int pathSize = witness.get(pointer);
@@ -226,9 +293,9 @@ public abstract class AbstractBlockProcessor implements BlockProcessor {
         path = Bytes.concatenate(path, witness.slice(pointer, 1).shiftRight(4));
         pointer += 1;
       }
-      Pair<Node<Bytes>, Integer> res = getStateTrieNode(witness, pointer, Bytes.concatenate(prvPath, path));
+      Pair<Node<Bytes>, Integer> res = getStateTrieNode(witness, pointer, Bytes.concatenate(prvPath, path), accessedCode, accessedStorage);
       pointer = res.r;
-      node = new ExtensionNode<>(path, res.l, null);
+      node = new ExtensionNode<>(path, res.l, new DefaultNodeFactory<>(b -> b));
     } else if (nodeID == 0x02) {
       //It is a leaf node.
       int accountType = witness.get(pointer);
@@ -261,17 +328,18 @@ public abstract class AbstractBlockProcessor implements BlockProcessor {
           codeHash = Hash.wrap(Bytes32.wrap(witness.slice(pointer, 32)));
           pointer += 32;
         } else {
-          // TODO need to store the code to the world itself.
-          codeHash = Hash.hash(witness.slice(pointer, codeLength));
+          Bytes code = witness.slice(pointer, codeLength);
+          codeHash = Hash.hash(code);
+          accessedCode.put(codeHash, code);
           pointer += codeLength;
         }
         Pair<Node<Bytes>, Integer> storagePair = getStorageTrieNode(witness, pointer, Bytes.EMPTY);
-        // TODO need to store the storage to the world itself.
         storageHash = Hash.wrap(storagePair.l.getHash());
+        accessedStorage.put(storageHash, new SimpleMerklePatriciaTrie<>(b -> b, storagePair.l));
         pointer = storagePair.r;
       }
       StateTrieAccountValue accountValue = new StateTrieAccountValue(nonce, balance, storageHash, codeHash);
-      node = new LeafNode<>(path, RLP.encode(accountValue::writeTo), null, b -> b);
+      node = new LeafNode<>(path, RLP.encode(accountValue::writeTo), new DefaultNodeFactory<>(b -> b), b -> b);
     } else if (nodeID == 0x03) {
       //It is a hash node
       node = new HashNode<>(Bytes32.wrap(witness.slice(pointer, 32)));
@@ -303,7 +371,7 @@ public abstract class AbstractBlockProcessor implements BlockProcessor {
           pointer = res.r;
         }
       }
-      node = new BranchNode<>(children, Optional.empty(), null, null);
+      node = new BranchNode<>(children, Optional.empty(), new DefaultNodeFactory<>(b -> b), b -> b);
     } else if (nodeID == 0x01) {
       //This is a extension node
       int pathSize = witness.get(pointer);
@@ -320,7 +388,7 @@ public abstract class AbstractBlockProcessor implements BlockProcessor {
       }
       Pair<Node<Bytes>, Integer> res = getStorageTrieNode(witness, pointer, Bytes.concatenate(prvPath, path));
       pointer = res.r;
-      node = new ExtensionNode<>(path, res.l, null);
+      node = new ExtensionNode<>(path, res.l, new DefaultNodeFactory<>(b -> b));
     } else if (nodeID == 0x02) {
       //It is a leaf node.
       Bytes fullPath = Bytes.EMPTY;
@@ -337,7 +405,7 @@ public abstract class AbstractBlockProcessor implements BlockProcessor {
       Bytes path = Bytes.concatenate(fullPath.slice(prvPath.size()), Bytes.of(0x10));
       Bytes value = RLP.encodeOne(witness.slice(pointer, 32).trimLeadingZeros());
       pointer += 32;
-      node = new LeafNode<>(path, value, null, b -> b);
+      node = new LeafNode<>(path, value, new DefaultNodeFactory<>(b -> b), b -> b);
     } else if (nodeID == 0x03) {
       //This is a hash node or null node.
       Bytes hash = witness.slice(pointer, 32);
