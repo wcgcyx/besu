@@ -33,6 +33,7 @@ import org.hyperledger.besu.ethereum.trie.StoredMerklePatriciaTrie;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Objects;
@@ -56,7 +57,7 @@ public class DefaultMutableWorldState implements MutableWorldState {
   private final Map<Bytes32, UInt256> newStorageKeyPreimages = new HashMap<>();
   private final Map<Bytes32, Address> newAccountKeyPreimages = new HashMap<>();
   private Map<Bytes32, Bytes> accessedCode = null;
-  private Map<Bytes32, MerklePatriciaTrie<Bytes32, Bytes>> accessedStorage = null;
+  private Map<Bytes32, List<MerklePatriciaTrie<Bytes32, Bytes>>> accessedStorageList = null;
 
   public DefaultMutableWorldState(
       final WorldStateStorage storage, final WorldStatePreimageStorage preimageStorage) {
@@ -94,8 +95,14 @@ public class DefaultMutableWorldState implements MutableWorldState {
   private MerklePatriciaTrie<Bytes32, Bytes> newAccountStorageTrie(final Bytes32 rootHash) {
     MerklePatriciaTrie<Bytes32, Bytes> res = new StoredMerklePatriciaTrie<>(
             worldStateStorage::getAccountStorageTrieNode, rootHash, b -> b, b -> b);
-    if (accessedStorage != null) {
-      accessedStorage.putIfAbsent(rootHash, res);
+    if (accessedStorageList != null) {
+      if (accessedStorageList.containsKey(rootHash)) {
+        accessedStorageList.get(rootHash).add(res);
+      } else {
+        List<MerklePatriciaTrie<Bytes32, Bytes>> storageList = new ArrayList<>();
+        storageList.add(res);
+        accessedStorageList.put(rootHash, storageList);
+      }
     }
     return res;
   }
@@ -449,7 +456,7 @@ public class DefaultMutableWorldState implements MutableWorldState {
   @Override
   public void startTracking() {
     accessedCode = new HashMap<>();
-    accessedStorage = new HashMap<>();
+    accessedStorageList = new HashMap<>();
   }
 
   @Override
@@ -458,14 +465,14 @@ public class DefaultMutableWorldState implements MutableWorldState {
   }
 
   @Override
-  public Map<Bytes32, MerklePatriciaTrie<Bytes32, Bytes>> getAccessedStorage() {
-    return accessedStorage;
+  public Map<Bytes32, List<MerklePatriciaTrie<Bytes32, Bytes>>> getAccessedStorageList() {
+    return accessedStorageList;
   }
 
   @Override
   public void stopTracking() {
     accessedCode = null;
-    accessedStorage = null;
+    accessedStorageList = null;
   }
 
   @Override

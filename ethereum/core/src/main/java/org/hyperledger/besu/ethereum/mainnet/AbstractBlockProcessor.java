@@ -33,6 +33,7 @@ import org.hyperledger.besu.ethereum.trie.Node;
 import org.hyperledger.besu.ethereum.vm.BlockHashLookup;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -173,17 +174,16 @@ public abstract class AbstractBlockProcessor implements BlockProcessor {
 
     // Get accessed code and storage tries.
     Map<Bytes32, Bytes> accessedCode = worldState.getAccessedCode();
-    Map<Bytes32, MerklePatriciaTrie<Bytes32, Bytes>> accessedStorage = worldState.getAccessedStorage();
+    Map<Bytes32, List<MerklePatriciaTrie<Bytes32, Bytes>>> accessedStorageList = worldState.getAccessedStorageList();
     // Stop tracking.
     worldState.stopTracking();
 
     // Replace updated storage tries with original storage tries
-    for (Bytes32 storageHash : accessedStorage.keySet()) {
-      MerklePatriciaTrie<Bytes32, Bytes> storageTrie = accessedStorage.get(storageHash);
-      if (storageTrie.getRootHash() != storageHash) {
-        // It has been updated during execution.
-        MerklePatriciaTrie<Bytes32, Bytes> originalStorageTrie = worldState.getStorageTrieByHash(storageHash);
-        // Try to load every leaf to the original storage trie.
+    Map<Bytes32, MerklePatriciaTrie<Bytes32, Bytes>> accessedStorage = new HashMap<>();
+    for (Bytes32 storageHash : accessedStorageList.keySet()) {
+      MerklePatriciaTrie<Bytes32, Bytes> originalStorageTrie = worldState.getStorageTrieByHash(storageHash);
+      // Try to load every leaf to the original storage trie.
+      for (MerklePatriciaTrie<Bytes32, Bytes> storageTrie : accessedStorageList.get(storageHash)) {
         Set<Bytes32> loadedLeafPathList = storageTrie.getLoadedLeaves();
         for (Bytes32 leaf : loadedLeafPathList) {
           originalStorageTrie.get(leaf);
@@ -192,9 +192,8 @@ public abstract class AbstractBlockProcessor implements BlockProcessor {
         for (Bytes32 leaf : removedLeaves) {
           originalStorageTrie.get(leaf);
         }
-        // Now replace with the loaded original storage trie.
-        accessedStorage.replace(storageHash, originalStorageTrie);
       }
+      accessedStorage.put(storageHash, originalStorageTrie);
     }
 
     // Try to load every leaf to original state trie
