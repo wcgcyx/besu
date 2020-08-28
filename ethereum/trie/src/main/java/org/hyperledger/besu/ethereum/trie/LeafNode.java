@@ -140,4 +140,9 @@ public class LeafNode<V> implements Node<V> {
   public void markDirty() {
     dirty = true;
   }
+
+  @Override
+  public Node<V> copy() {
+    return new LeafNode<>(path, value, nodeFactory, valueSerializer);
+  }
 }

@@ -91,4 +91,9 @@ public class NullNode<V> implements Node<V> {
   public void markDirty() {
     // do nothing
   }
+
+  @Override
+  public Node<V> copy() {
+    return instance();
+  }
 }

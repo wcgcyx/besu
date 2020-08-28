@@ -148,4 +148,10 @@ public class ExtensionNode<V> implements Node<V> {
   public void markDirty() {
     dirty = true;
   }
+
+  @Override
+  public Node<V> copy() {
+    Node<V> childCopy = child.copy();
+    return new ExtensionNode<>(path, childCopy, nodeFactory);
+  }
 }

@@ -88,4 +88,6 @@ public interface MerklePatriciaTrie<K, V> {
   Map<Bytes32, V> entriesFrom(Bytes32 startKeyHash, int limit);
 
   void visitAll(Consumer<Node<V>> visitor);
+
+  default MerklePatriciaTrie<K, V> copy() { return null; }
 }

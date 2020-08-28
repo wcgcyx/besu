@@ -227,4 +227,13 @@ public class BranchNode<V> implements Node<V> {
   public void markDirty() {
     dirty = true;
   }
+
+  @Override
+  public Node<V> copy() {
+    ArrayList<Node<V>> childrenCopy = new ArrayList<>();
+    for (Node<V> child : children) {
+      childrenCopy.add(child.copy());
+    }
+    return new BranchNode<>(childrenCopy, value, nodeFactory, valueSerializer);
+  }
 }

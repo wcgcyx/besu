@@ -67,4 +67,6 @@ public interface Node<V> {
   default void unload() {}
 
   static Node<Bytes> newNullNode() { return NullNode.instance(); }
+
+  default Node<V> copy() { return null; }
 }

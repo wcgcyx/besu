@@ -96,4 +96,9 @@ public class HashNode<V> implements Node<V> {
   public void markDirty() {
     // do nothing
   }
+
+  @Override
+  public Node<V> copy() {
+    return new HashNode<>(hash);
+  }
 }

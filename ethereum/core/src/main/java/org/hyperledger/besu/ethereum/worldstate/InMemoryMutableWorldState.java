@@ -134,8 +134,9 @@ public class InMemoryMutableWorldState implements MutableWorldState {
       final MerklePatriciaTrie<Bytes32, Bytes> updatedTrie = updatedStorageTries.get(address);
       if (updatedTrie != null) {
         storageTrie = updatedTrie;
-      } else {
-        storageTrie = accessedStorage.getOrDefault(getStorageRoot(), null);
+      }
+      if (storageTrie == null) {
+        storageTrie = accessedStorage.getOrDefault(getStorageRoot(), null).copy();
       }
       return storageTrie;
     }
