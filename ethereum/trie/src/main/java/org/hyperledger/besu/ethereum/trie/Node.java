@@ -14,11 +14,13 @@
  */
 package org.hyperledger.besu.ethereum.trie;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 import org.apache.tuweni.bytes.Bytes;
 import org.apache.tuweni.bytes.Bytes32;
+import org.hyperledger.besu.ethereum.rlp.RLP;
 
 public interface Node<V> {
 
@@ -65,4 +67,36 @@ public interface Node<V> {
 
   /** Unloads the node if it is, for example, a StoredNode. */
   default void unload() {}
+
+  default Node<V> load() { return null; }
+
+  default Node<V> getLoaded() { return null; }
+
+  default boolean isHashNode() { return this instanceof StoredNode && this.getLoaded() == null; }
+
+  default boolean isBranchNode() { return (this instanceof StoredNode ? this.getLoaded() : this) instanceof BranchNode; }
+
+  default boolean isExtensionNode() { return (this instanceof StoredNode ? this.getLoaded() : this) instanceof ExtensionNode; }
+
+  default boolean isLeafNode() { return (this instanceof StoredNode ? this.getLoaded() : this) instanceof LeafNode; }
+
+  default boolean isNullNode() { return (this instanceof StoredNode ? this.getLoaded() : this) instanceof NullNode; }
+
+  default Bytes getBitMask() { return this instanceof StoredNode ? this.getLoaded().getBitMask() : null; }
+
+  default Bytes getExtensionPath() { return this instanceof StoredNode ? this.getLoaded().getExtensionPath() : null; }
+
+  default Bytes32 getLeafPath(final Bytes prvPath) { return this instanceof StoredNode ? this.getLoaded().getLeafPath(prvPath) : null; }
+
+  default Node<V> copy() { return null; }
+
+  static Node<Bytes> newNullNode() { return NullNode.instance(); }
+
+  static Node<Bytes> newBranchNode(final ArrayList<Node<Bytes>> children) { return new BranchNode<>(children, Optional.empty(), new DefaultNodeFactory<>(b -> b), b -> b); }
+
+  static Node<Bytes> newExtensionNode(final Bytes path, final Node<Bytes> child) { return new ExtensionNode<>(path, child, new DefaultNodeFactory<>(b -> b)); }
+
+  static Node<Bytes> newLeafNode(final Bytes path, final Bytes value) { return new LeafNode<>(path, value, new DefaultNodeFactory<>(b -> b), b -> b); }
+
+  static Node<Bytes> newHashNode(final Bytes32 hash) { return new HashNode<>(hash); }
 }

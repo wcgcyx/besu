@@ -227,4 +227,28 @@ class BranchNode<V> implements Node<V> {
   public void markDirty() {
     dirty = true;
   }
+
+  @Override
+  public Bytes getBitMask() {
+    Bytes res1 = Bytes.of(0x00);
+    Bytes res2 = Bytes.of(0x00);
+    for (int i = 0; i < 8; i++) {
+      if (!(children.get(i) instanceof NullNode)) {
+        res1 = res1.or(Bytes.of(0x80 >> i));
+      }
+      if (!(children.get(i + 8) instanceof NullNode)) {
+        res2 = res2.or(Bytes.of(0x80 >> i));
+      }
+    }
+    return Bytes.concatenate(res1, res2);
+  }
+
+  @Override
+  public Node<V> copy() {
+    ArrayList<Node<V>> childrenCopy = new ArrayList<>();
+    for (Node<V> child : children) {
+      childrenCopy.add(child.copy());
+    }
+    return new BranchNode<>(childrenCopy, value, nodeFactory, valueSerializer);
+  }
 }

@@ -29,6 +29,8 @@ import org.hyperledger.besu.ethereum.api.jsonrpc.internal.methods.EthGetBlockByH
 import org.hyperledger.besu.ethereum.api.jsonrpc.internal.methods.EthGetBlockByNumber;
 import org.hyperledger.besu.ethereum.api.jsonrpc.internal.methods.EthGetBlockTransactionCountByHash;
 import org.hyperledger.besu.ethereum.api.jsonrpc.internal.methods.EthGetBlockTransactionCountByNumber;
+import org.hyperledger.besu.ethereum.api.jsonrpc.internal.methods.EthGetBlockWitnessByHash;
+import org.hyperledger.besu.ethereum.api.jsonrpc.internal.methods.EthGetBlockWitnessByNumber;
 import org.hyperledger.besu.ethereum.api.jsonrpc.internal.methods.EthGetCode;
 import org.hyperledger.besu.ethereum.api.jsonrpc.internal.methods.EthGetFilterChanges;
 import org.hyperledger.besu.ethereum.api.jsonrpc.internal.methods.EthGetFilterLogs;
@@ -114,6 +116,8 @@ public class EthJsonRpcMethods extends ApiGroupJsonRpcMethods {
         new EthGetBlockByNumber(blockchainQueries, blockResult),
         new EthGetBlockTransactionCountByNumber(blockchainQueries),
         new EthGetBlockTransactionCountByHash(blockchainQueries),
+        new EthGetBlockWitnessByHash(blockchainQueries, protocolSchedule),
+        new EthGetBlockWitnessByNumber(blockchainQueries, protocolSchedule),
         new EthCall(
             blockchainQueries,
             new TransactionSimulator(

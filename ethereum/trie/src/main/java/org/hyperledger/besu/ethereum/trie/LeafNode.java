@@ -140,4 +140,14 @@ class LeafNode<V> implements Node<V> {
   public void markDirty() {
     dirty = true;
   }
+
+  @Override
+  public Bytes32 getLeafPath(final Bytes prvPath) {
+    return Bytes32.wrap(CompactEncoding.pathToBytes(Bytes.concatenate(prvPath, path)));
+  }
+
+  @Override
+  public Node<V> copy() {
+    return new LeafNode<>(path, value, nodeFactory, valueSerializer);
+  }
 }

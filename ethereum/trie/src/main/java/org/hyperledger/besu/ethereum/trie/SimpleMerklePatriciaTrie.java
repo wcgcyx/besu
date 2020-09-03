@@ -36,6 +36,7 @@ public class SimpleMerklePatriciaTrie<K extends Bytes, V> implements MerklePatri
   private final PathNodeVisitor<V> getVisitor = new GetVisitor<>();
   private final PathNodeVisitor<V> removeVisitor = new RemoveVisitor<>();
   private final DefaultNodeFactory<V> nodeFactory;
+  private final Function<V, Bytes> valueSerializer;
 
   private Node<V> root;
 
@@ -45,8 +46,15 @@ public class SimpleMerklePatriciaTrie<K extends Bytes, V> implements MerklePatri
    * @param valueSerializer A function for serializing values to bytes.
    */
   public SimpleMerklePatriciaTrie(final Function<V, Bytes> valueSerializer) {
+    this.valueSerializer = valueSerializer;
     this.nodeFactory = new DefaultNodeFactory<>(valueSerializer);
     this.root = NullNode.instance();
+  }
+
+  public SimpleMerklePatriciaTrie(final Function<V, Bytes> valueSerializer, final Node<V> root) {
+    this.valueSerializer = valueSerializer;
+    this.nodeFactory = new DefaultNodeFactory<>(valueSerializer);
+    this.root = root;
   }
 
   @Override
@@ -101,5 +109,11 @@ public class SimpleMerklePatriciaTrie<K extends Bytes, V> implements MerklePatri
   @Override
   public void visitAll(final Consumer<Node<V>> visitor) {
     root.accept(new AllNodesVisitor<>(visitor));
+  }
+
+  @Override
+  public MerklePatriciaTrie<K, V> copy() {
+    Node<V> rootCopy = this.root.copy();
+    return new SimpleMerklePatriciaTrie<>(valueSerializer, rootCopy);
   }
 }

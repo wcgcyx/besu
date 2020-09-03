@@ -43,6 +43,7 @@ import java.util.stream.Stream;
 import org.apache.tuweni.bytes.Bytes;
 import org.apache.tuweni.bytes.Bytes32;
 import org.apache.tuweni.units.bigints.UInt256;
+import org.hyperledger.besu.ethereum.trie.WitnessTracking;
 
 public class DefaultMutableWorldState implements MutableWorldState {
 
@@ -90,6 +91,7 @@ public class DefaultMutableWorldState implements MutableWorldState {
   }
 
   private MerklePatriciaTrie<Bytes32, Bytes> newAccountStorageTrie(final Bytes32 rootHash) {
+    WitnessTracking.addLoadedStorage(rootHash);
     return new StoredMerklePatriciaTrie<>(
         worldStateStorage::getAccountStorageTrieNode, rootHash, b -> b, b -> b);
   }
@@ -269,6 +271,7 @@ public class DefaultMutableWorldState implements MutableWorldState {
       if (codeHash.equals(Hash.EMPTY)) {
         return Bytes.EMPTY;
       }
+      WitnessTracking.addLoadedCode(codeHash);
       return worldStateStorage.getCode(codeHash).orElse(Bytes.EMPTY);
     }
 
@@ -434,5 +437,15 @@ public class DefaultMutableWorldState implements MutableWorldState {
         wrapped.accountStateTrie.put(updated.getAddressHash(), account);
       }
     }
+  }
+
+  @Override
+  public MerklePatriciaTrie<Bytes32, Bytes> getAccountStateTrie() {
+    return accountStateTrie;
+  }
+
+  @Override
+  public WorldStateStorage getWorldStateStorage() {
+    return worldStateStorage;
   }
 }
