@@ -21,8 +21,8 @@ public class Witness {
   }
 
   @JsonGetter(value = "data")
-  public Bytes getData() {
-    return data;
+  public String getData() {
+    return data.toHexString();
   }
 
   @JsonGetter(value = "error")
@@ -30,4 +30,3 @@ public class Witness {
     return error;
   }
 }
-
