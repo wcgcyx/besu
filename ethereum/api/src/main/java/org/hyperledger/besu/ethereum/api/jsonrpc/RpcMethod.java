@@ -72,6 +72,7 @@ public enum RpcMethod {
   ETH_GET_BLOCK_TRANSACTION_COUNT_BY_NUMBER("eth_getBlockTransactionCountByNumber"),
   ETH_GET_BLOCK_WITNESS_BY_HASH("eth_getBlockWitnessByHash"),
   ETH_GET_BLOCK_WITNESS_BY_NUMBER("eth_getBlockWitnessByNumber"),
+  ETH_GET_BLOCK("eth_getBlock"),
   ETH_GET_CODE("eth_getCode"),
   ETH_GET_FILTER_CHANGES("eth_getFilterChanges"),
   ETH_GET_FILTER_LOGS("eth_getFilterLogs"),
