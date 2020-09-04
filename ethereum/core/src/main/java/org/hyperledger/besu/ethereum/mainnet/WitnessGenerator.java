@@ -49,7 +49,9 @@ public class WitnessGenerator {
     WitnessTracking.startTracking();
 
     // Process block
-    blockProcessor.processBlock(blockchain, worldState, block);
+    if (!blockProcessor.processBlock(blockchain, worldState, block).isSuccessful()) {
+      return new Witness(1, Bytes.EMPTY);
+    }
 
     // Obtain tracking result
     Set<Bytes32> loadedNodes = WitnessTracking.getLoadedNodes();
@@ -96,7 +98,9 @@ public class WitnessGenerator {
       Map<Bytes32, MerklePatriciaTrie<Bytes32, Bytes>> accessedStorageVerify = new HashMap<>();
       Pair<Node<Bytes>, Integer> res = getStateTrieNode(witness, 2, Bytes.EMPTY, accessedCodeVerify, accessedStorageVerify);
       MutableWorldState worldStateVerify = new InMemoryMutableWorldState(new SimpleMerklePatriciaTrie<>(b -> b, res.l), accessedCodeVerify, accessedStorageVerify);
-      blockProcessor.processBlock(blockchain, worldStateVerify, block);
+      if (!blockProcessor.processBlock(blockchain, worldStateVerify, block).isSuccessful()) {
+        return new Witness(2, Bytes.EMPTY);
+      }
       if (!worldStateVerify.rootHash().equals(worldState.rootHash())) {
         return new Witness(2, Bytes.EMPTY);
       }

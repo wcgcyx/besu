@@ -58,7 +58,7 @@ public class EthGetBlockWitnessByHash implements JsonRpcMethod {
 
     Block block = maybeBlock.get();
     long blockNumber = block.getHeader().getNumber();
-    Optional<MutableWorldState> maybeWorldState = blockchainQueries.getWorldState(blockNumber);
+    Optional<MutableWorldState> maybeWorldState = blockchainQueries.getWorldState(blockNumber - 1);
 
     if (maybeWorldState.isEmpty()) {
       return new JsonRpcSuccessResponse(requestContext.getRequest().getId(), null);
