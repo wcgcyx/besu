@@ -21,9 +21,9 @@ import java.util.Set;
 
 public class WitnessTracking {
 
-  private static Set<Bytes32> loadedNodes = new HashSet<>();
-  private static Set<Bytes32> loadedCode = new HashSet<>();
-  private static Set<Bytes32> loadedStorage = new HashSet<>();
+  private static Set<Bytes32> loadedNodes = null;
+  private static Set<Bytes32> loadedCode = null;
+  private static Set<Bytes32> loadedStorage = null;
 
   public static void startTracking() {
     WitnessTracking.loadedNodes = new HashSet<>();
