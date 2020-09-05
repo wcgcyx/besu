@@ -28,6 +28,8 @@ import org.hyperledger.besu.ethereum.mainnet.ProtocolSchedule;
 import org.hyperledger.besu.ethereum.mainnet.Witness;
 import org.hyperledger.besu.ethereum.mainnet.WitnessGenerator;
 
+import java.io.FileOutputStream;
+import java.io.PrintStream;
 import java.util.Optional;
 
 public class EthGetBlockWitnessByHash implements JsonRpcMethod {
@@ -48,6 +50,7 @@ public class EthGetBlockWitnessByHash implements JsonRpcMethod {
   @Override
   public JsonRpcResponse response(final JsonRpcRequestContext requestContext) {
     final Hash blockHash = requestContext.getRequiredParameter(0, Hash.class);
+    final Optional<String> fileName = requestContext.getOptionalParameter(1, String.class);
 
     Blockchain blockchain = blockchainQueries.getBlockchain();
     Optional<Block> maybeBlock = blockchain.getBlockByHash(blockHash);
@@ -68,6 +71,15 @@ public class EthGetBlockWitnessByHash implements JsonRpcMethod {
     BlockProcessor blockprocessor = protocolSchedule.getByBlockNumber(blockNumber).getBlockProcessor();
 
     Witness witness = WitnessGenerator.generateWitness(blockprocessor, blockchain, worldState, block);
+
+    if (fileName.isPresent()) {
+      try (PrintStream out = new PrintStream(new FileOutputStream(fileName.get()))) {
+        out.println(witness.data.toHexString());
+      } catch (Exception e) {
+        return new JsonRpcSuccessResponse(requestContext.getRequest().getId(), null);
+      }
+      return new JsonRpcSuccessResponse(requestContext.getRequest().getId(), witness.error);
+    }
 
     return new JsonRpcSuccessResponse(requestContext.getRequest().getId(), witness);
   }
