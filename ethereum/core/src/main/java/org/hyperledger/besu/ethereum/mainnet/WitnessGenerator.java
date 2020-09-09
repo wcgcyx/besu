@@ -32,6 +32,8 @@ import org.hyperledger.besu.ethereum.worldstate.InMemoryMutableWorldState;
 import org.hyperledger.besu.ethereum.worldstate.StateTrieAccountValue;
 import org.hyperledger.besu.ethereum.worldstate.WorldStateStorage;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -40,8 +42,10 @@ import java.util.Set;
 
 public class WitnessGenerator {
 
-  public static Witness generateWitness(final BlockProcessor blockProcessor, final Blockchain blockchain,
+  public static void generateWitness(final BlockProcessor blockProcessor, final Blockchain blockchain,
                                         final MutableWorldState worldState, final Block block) {
+    Instant timeStart = Instant.now();
+
     // Get a copy of the initial world state
     MutableWorldState initialWorldState = worldState.copy();
 
@@ -50,7 +54,8 @@ public class WitnessGenerator {
 
     // Process block
     if (!blockProcessor.processBlock(blockchain, worldState, block).isSuccessful()) {
-      return new Witness(1, Bytes.EMPTY);
+      Witness.error = 1;
+      return;
     }
 
     // Obtain tracking result
@@ -89,8 +94,12 @@ public class WitnessGenerator {
     try {
       witness = Bytes.concatenate(Bytes.of(0x01, 0x00), generateStateTrieWitness(root, worldStateStorage, accessedCode, accessedStorage, Bytes.EMPTY));
     } catch (Exception e) {
-      return new Witness(1, Bytes.EMPTY);
+      Witness.error = 1;
+      return;
     }
+
+    // Get creation time
+    Witness.creationTime = Duration.between(timeStart, Instant.now());
 
     // Verify witness
     try {
@@ -99,16 +108,20 @@ public class WitnessGenerator {
       Pair<Node<Bytes>, Integer> res = getStateTrieNode(witness, 2, Bytes.EMPTY, accessedCodeVerify, accessedStorageVerify);
       MutableWorldState worldStateVerify = new InMemoryMutableWorldState(new SimpleMerklePatriciaTrie<>(b -> b, res.l), accessedCodeVerify, accessedStorageVerify);
       if (!blockProcessor.processBlock(blockchain, worldStateVerify, block).isSuccessful()) {
-        return new Witness(2, Bytes.EMPTY);
+        Witness.error = 2;
+        return;
       }
       if (!worldStateVerify.rootHash().equals(worldState.rootHash())) {
-        return new Witness(2, Bytes.EMPTY);
+        Witness.error = 2;
+        return;
       }
     } catch (Exception e) {
-      return new Witness(2, Bytes.EMPTY);
+      Witness.error = 2;
+      return;
     }
 
-    return new Witness(0, witness);
+    Witness.error = 0;
+    Witness.data = witness;
   }
 
   private static void loadFromNode(final Node<Bytes> node, final Set<Bytes32> loadedNodes) {
@@ -236,6 +249,7 @@ public class WitnessGenerator {
     byte nodeID = witness.get(pointer);
     pointer += 1;
     if (nodeID == 0x00) {
+      Witness.stateTrieBranchNodes += 1;
       //This is a branch node
       Bytes bitmask = witness.slice(pointer, 2);
       pointer += 2;
@@ -252,6 +266,7 @@ public class WitnessGenerator {
       node = Node.newBranchNode(children);
     } else if (nodeID == 0x01) {
       //This is a extension node
+      Witness.stateTrieExtensionNodes += 1;
       int pathSize = witness.get(pointer);
       pointer += 1;
       Bytes path = Bytes.EMPTY;
@@ -268,6 +283,8 @@ public class WitnessGenerator {
       pointer = res.r;
       node = Node.newExtensionNode(path, res.l);
     } else if (nodeID == 0x02) {
+      int startPointer = pointer;
+      Witness.stateTrieLeafNodes += 1;
       //It is a leaf node.
       int accountType = witness.get(pointer);
       pointer += 1;
@@ -310,7 +327,10 @@ public class WitnessGenerator {
       }
       StateTrieAccountValue accountValue = new StateTrieAccountValue(nonce, balance, storageHash, codeHash, Account.DEFAULT_VERSION);
       node = Node.newLeafNode(path, RLP.encode(accountValue::writeTo));
+      Witness.stateTrieLeafSize += (pointer - startPointer);
     } else if (nodeID == 0x03) {
+      Witness.stateTrieHashNodes += 1;
+      Witness.stateTrieHashSize += 32;
       //It is a hash node
       node = Node.newHashNode(Bytes32.wrap(witness.slice(pointer, 32)));
       pointer += 32;
@@ -327,6 +347,7 @@ public class WitnessGenerator {
     byte nodeID = witness.get(pointer);
     pointer += 1;
     if (nodeID == 0x00) {
+      Witness.storageTrieBranchNodes += 1;
       //This is a branch node
       Bytes bitmask = witness.slice(pointer, 2);
       pointer += 2;
@@ -342,6 +363,7 @@ public class WitnessGenerator {
       }
       node = Node.newBranchNode(children);
     } else if (nodeID == 0x01) {
+      Witness.storageTrieExtensionNodes += 1;
       //This is a extension node
       int pathSize = witness.get(pointer);
       pointer += 1;
@@ -359,6 +381,8 @@ public class WitnessGenerator {
       pointer = res.r;
       node = Node.newExtensionNode(path, res.l);
     } else if (nodeID == 0x02) {
+      int startPointer = pointer;
+      Witness.storageTrieLeafNodes += 1;
       //It is a leaf node.
       Bytes fullPath = Bytes.EMPTY;
       for (int i = 0; i < 32; i++) {
@@ -374,7 +398,10 @@ public class WitnessGenerator {
       Bytes value = RLP.encodeOne(witness.slice(pointer, 32).trimLeadingZeros());
       pointer += 32;
       node = Node.newLeafNode(path, value);
+      Witness.storageTrieLeafSize += (pointer - startPointer);
     } else if (nodeID == 0x03) {
+      Witness.storageTrieHashNodes += 1;
+      Witness.storageTrieHashsize += 32;
       //This is a hash node or null node.
       Bytes hash = witness.slice(pointer, 32);
       pointer += 32;

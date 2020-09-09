@@ -63,17 +63,31 @@ public class EthGetBlockWitnessByNumber implements JsonRpcMethod {
     Block block = maybeBlock.get();
     MutableWorldState worldState = maybeWorldState.get();
 
-    Witness witness = WitnessGenerator.generateWitness(blockprocessor, blockchain, worldState, block);
+    WitnessGenerator.generateWitness(blockprocessor, blockchain, worldState, block);
 
     if (fileName.isPresent()) {
       try (PrintStream out = new PrintStream(new FileOutputStream(fileName.get()))) {
-        out.println(witness.data.toHexString());
+        out.println(Witness.error);
+        out.println(Witness.data.size());
+        out.println(Witness.creationTime.toString());
+        out.println(Witness.stateTrieBranchNodes);
+        out.println(Witness.stateTrieExtensionNodes);
+        out.println(Witness.stateTrieHashNodes);
+        out.println(Witness.stateTrieLeafNodes);
+        out.println(Witness.stateTrieHashSize);
+        out.println(Witness.stateTrieLeafSize);
+        out.println(Witness.storageTrieBranchNodes);
+        out.println(Witness.storageTrieExtensionNodes);
+        out.println(Witness.storageTrieHashNodes);
+        out.println(Witness.storageTrieLeafNodes);
+        out.println(Witness.storageTrieHashsize);
+        out.println(Witness.storageTrieLeafSize);
+        Witness.clear();
       } catch (Exception e) {
         return new JsonRpcSuccessResponse(requestContext.getRequest().getId(), null);
       }
-      return new JsonRpcSuccessResponse(requestContext.getRequest().getId(), witness.error);
     }
 
-    return new JsonRpcSuccessResponse(requestContext.getRequest().getId(), witness);
+    return new JsonRpcSuccessResponse(requestContext.getRequest().getId(), Witness.error);
   }
 }

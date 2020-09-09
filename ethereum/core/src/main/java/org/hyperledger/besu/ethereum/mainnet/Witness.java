@@ -14,33 +14,61 @@
  */
 package org.hyperledger.besu.ethereum.mainnet;
 
-import com.fasterxml.jackson.annotation.JsonGetter;
-import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import org.apache.tuweni.bytes.Bytes;
+import java.time.Duration;
 
-@JsonPropertyOrder({"data", "error"})
 public class Witness {
 
   // Error code is 0 if nothing goes wrong,
   // 1 if generation goes wrong,
   // 2 if verification(consumption) goes wrong.
-  public int error;
+  public static int error = 0;
 
   // Witness in bytes.
-  public Bytes data;
+  public static Bytes data = null;
 
-  public Witness(final int error, final Bytes data) {
-    this.error = error;
-    this.data = data;
-  }
+  // Interesting data.
+  public static Duration creationTime = null;
 
-  @JsonGetter(value = "data")
-  public String getData() {
-    return data.toHexString();
-  }
+  public static int stateTrieBranchNodes = 0;
 
-  @JsonGetter(value = "error")
-  public int getError() {
-    return error;
+  public static int stateTrieExtensionNodes = 0;
+
+  public static int stateTrieHashNodes = 0;
+
+  public static int stateTrieLeafNodes = 0;
+
+  public static int stateTrieHashSize = 0;
+
+  public static int stateTrieLeafSize = 0;
+
+  public static int storageTrieBranchNodes = 0;
+
+  public static int storageTrieExtensionNodes = 0;
+
+  public static int storageTrieHashNodes = 0;
+
+  public static int storageTrieLeafNodes = 0;
+
+  public static int storageTrieHashsize = 0;
+
+  public static int storageTrieLeafSize = 0;
+
+  public static void clear() {
+    error = 0;
+    data = null;
+    creationTime = null;
+    stateTrieBranchNodes = 0;
+    stateTrieExtensionNodes = 0;
+    stateTrieHashNodes = 0;
+    stateTrieLeafNodes = 0;
+    stateTrieHashSize = 0;
+    stateTrieLeafSize = 0;
+    storageTrieBranchNodes = 0;
+    storageTrieExtensionNodes = 0;
+    storageTrieHashNodes = 0;
+    storageTrieLeafNodes = 0;
+    storageTrieHashsize = 0;
+    storageTrieLeafSize = 0;
   }
 }
