@@ -103,24 +103,24 @@ public class WitnessGenerator {
     Witness.creationTime = Duration.between(timeStart, Instant.now());
 
     // Verify witness
-    try {
-      Map<Bytes32, Bytes> accessedCodeVerify = new HashMap<>();
-      Map<Bytes32, MerklePatriciaTrie<Bytes32, Bytes>> accessedStorageVerify = new HashMap<>();
-      Pair<Node<Bytes>, Integer> res = getStateTrieNode(witness, 2, Bytes.EMPTY, accessedCodeVerify, accessedStorageVerify);
-      MutableWorldState worldStateVerify = new InMemoryMutableWorldState(new SimpleMerklePatriciaTrie<>(b -> b, res.l), accessedCodeVerify, accessedStorageVerify);
-      if (!blockProcessor.processBlock(blockchain, worldStateVerify, block).isSuccessful()) {
-        Witness.error = 3;
-        return;
-      }
-      if (!worldStateVerify.rootHash().equals(worldState.rootHash())) {
-        Witness.error = 4;
-        return;
-      }
-    } catch (Exception e) {
-      Witness.error = 5;
-      Witness.errorMsg += e;
-      return;
-    }
+//    try {
+//      Map<Bytes32, Bytes> accessedCodeVerify = new HashMap<>();
+//      Map<Bytes32, MerklePatriciaTrie<Bytes32, Bytes>> accessedStorageVerify = new HashMap<>();
+//      Pair<Node<Bytes>, Integer> res = getStateTrieNode(witness, 2, Bytes.EMPTY, accessedCodeVerify, accessedStorageVerify);
+//      MutableWorldState worldStateVerify = new InMemoryMutableWorldState(new SimpleMerklePatriciaTrie<>(b -> b, res.l), accessedCodeVerify, accessedStorageVerify);
+//      if (!blockProcessor.processBlock(blockchain, worldStateVerify, block).isSuccessful()) {
+//        Witness.error = 3;
+//        return;
+//      }
+//      if (!worldStateVerify.rootHash().equals(worldState.rootHash())) {
+//        Witness.error = 4;
+//        return;
+//      }
+//    } catch (Exception e) {
+//      Witness.error = 5;
+//      Witness.errorMsg += e;
+//      return;
+//    }
 
     Witness.error = 0;
     Witness.data = witness;
