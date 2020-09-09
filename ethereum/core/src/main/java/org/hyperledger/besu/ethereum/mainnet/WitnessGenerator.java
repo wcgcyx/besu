@@ -118,7 +118,7 @@ public class WitnessGenerator {
       }
     } catch (Exception e) {
       Witness.error = 5;
-      Witness.errorMsg = " " + e;
+      Witness.errorMsg += e;
       return;
     }
 
@@ -191,6 +191,7 @@ public class WitnessGenerator {
       }
     } else {
       // This should never happen
+      Witness.errorMsg += "-1-";
       return null;
     }
     return witness;
@@ -228,6 +229,7 @@ public class WitnessGenerator {
               RLP.input(node.getValue().get()).readUInt256Scalar().toBytes());
     } else {
       // This should never happen
+      Witness.errorMsg += "-2-";
       return null;
     }
     return witness;
@@ -298,6 +300,7 @@ public class WitnessGenerator {
       }
       if (fullPath.commonPrefixLength(prvPath) != prvPath.size()) {
         // This should never happen.
+        Witness.errorMsg += "-3-";
         return null;
       }
       // Add terminator
@@ -339,6 +342,7 @@ public class WitnessGenerator {
       pointer += 32;
     } else {
       //This should never happen
+      Witness.errorMsg += "-4-";
       return null;
     }
     return new Pair<>(node, pointer);
@@ -395,6 +399,7 @@ public class WitnessGenerator {
       }
       if (fullPath.commonPrefixLength(prvPath) != prvPath.size()) {
         // This should never happen.
+        Witness.errorMsg += "-5-";
         return null;
       }
       Bytes path = Bytes.concatenate(fullPath.slice(prvPath.size()), Bytes.of(0x10));
@@ -415,6 +420,7 @@ public class WitnessGenerator {
       }
     } else {
       //This should never happen
+      Witness.errorMsg += "-6-";
       return null;
     }
     return new Pair<>(node, pointer);
