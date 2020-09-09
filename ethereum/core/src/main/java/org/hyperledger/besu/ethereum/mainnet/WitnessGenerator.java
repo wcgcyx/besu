@@ -95,7 +95,7 @@ public class WitnessGenerator {
       witness = Bytes.concatenate(Bytes.of(0x01, 0x00), generateStateTrieWitness(root, worldStateStorage, accessedCode, accessedStorage, Bytes.EMPTY));
     } catch (Exception e) {
       Witness.error = 2;
-      Witness.errorMsg = e.getMessage();
+      Witness.errorMsg = " " + e;
       return;
     }
 
@@ -118,7 +118,7 @@ public class WitnessGenerator {
       }
     } catch (Exception e) {
       Witness.error = 5;
-      Witness.errorMsg = e.getMessage();
+      Witness.errorMsg = " " + e;
       return;
     }
 
