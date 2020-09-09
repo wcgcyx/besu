@@ -42,6 +42,8 @@ public class Witness {
 
   public static int stateTrieLeafSize = 0;
 
+  public static int stateTrieLeafCode = 0;
+
   public static int storageTrieBranchNodes = 0;
 
   public static int storageTrieExtensionNodes = 0;
@@ -64,6 +66,7 @@ public class Witness {
     stateTrieLeafNodes = 0;
     stateTrieHashSize = 0;
     stateTrieLeafSize = 0;
+    stateTrieLeafCode = 0;
     storageTrieBranchNodes = 0;
     storageTrieExtensionNodes = 0;
     storageTrieHashNodes = 0;

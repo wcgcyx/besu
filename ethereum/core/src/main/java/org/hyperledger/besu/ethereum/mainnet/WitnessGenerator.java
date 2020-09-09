@@ -319,6 +319,7 @@ public class WitnessGenerator {
           codeHash = Hash.hash(code);
           accessedCode.put(codeHash, code);
           pointer += codeLength;
+          Witness.stateTrieLeafCode += codeLength;
         }
         Pair<Node<Bytes>, Integer> storagePair = getStorageTrieNode(witness, pointer, Bytes.EMPTY);
         storageHash = Hash.wrap(storagePair.l.getHash());

@@ -83,6 +83,7 @@ public class EthGetBlockWitnessByHash implements JsonRpcMethod {
         out.println(Witness.stateTrieLeafNodes);
         out.println(Witness.stateTrieHashSize);
         out.println(Witness.stateTrieLeafSize);
+        out.println(Witness.stateTrieLeafCode);
         out.println(Witness.storageTrieBranchNodes);
         out.println(Witness.storageTrieExtensionNodes);
         out.println(Witness.storageTrieHashNodes);
