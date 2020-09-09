@@ -118,10 +118,10 @@ public class Runner implements AutoCloseable {
 //      websocketRpc.ifPresent(service -> waitForServiceToStart("websocketRpc", service.start()));
 //      metrics.ifPresent(service -> waitForServiceToStart("metrics", service.start()));
       LOG.info("Ethereum main loop is up.");
-//      writeBesuPortsToFile();
-//      writeBesuNetworksToFile();
-//      autoTransactionLogBloomCachingService.ifPresent(AutoTransactionLogBloomCachingService::start);
-//      writePidFile();
+      writeBesuPortsToFile();
+      writeBesuNetworksToFile();
+      autoTransactionLogBloomCachingService.ifPresent(AutoTransactionLogBloomCachingService::start);
+      writePidFile();
     } catch (final Exception ex) {
       LOG.error("Startup failed", ex);
       throw new IllegalStateException(ex);
