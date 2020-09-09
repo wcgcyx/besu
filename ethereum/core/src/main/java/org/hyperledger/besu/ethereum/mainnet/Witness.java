@@ -24,6 +24,8 @@ public class Witness {
   // 2 if verification(consumption) goes wrong.
   public static int error = 0;
 
+  public static String errorMsg = "";
+
   // Witness in bytes.
   public static Bytes data = null;
 
@@ -58,6 +60,7 @@ public class Witness {
 
   public static void clear() {
     error = 0;
+    errorMsg = "";
     data = null;
     creationTime = null;
     stateTrieBranchNodes = 0;

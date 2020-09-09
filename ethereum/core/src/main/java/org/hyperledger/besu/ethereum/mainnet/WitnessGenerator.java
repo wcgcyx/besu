@@ -94,7 +94,8 @@ public class WitnessGenerator {
     try {
       witness = Bytes.concatenate(Bytes.of(0x01, 0x00), generateStateTrieWitness(root, worldStateStorage, accessedCode, accessedStorage, Bytes.EMPTY));
     } catch (Exception e) {
-      Witness.error = 1;
+      Witness.error = 2;
+      Witness.errorMsg = e.getMessage();
       return;
     }
 
@@ -108,15 +109,16 @@ public class WitnessGenerator {
       Pair<Node<Bytes>, Integer> res = getStateTrieNode(witness, 2, Bytes.EMPTY, accessedCodeVerify, accessedStorageVerify);
       MutableWorldState worldStateVerify = new InMemoryMutableWorldState(new SimpleMerklePatriciaTrie<>(b -> b, res.l), accessedCodeVerify, accessedStorageVerify);
       if (!blockProcessor.processBlock(blockchain, worldStateVerify, block).isSuccessful()) {
-        Witness.error = 2;
+        Witness.error = 3;
         return;
       }
       if (!worldStateVerify.rootHash().equals(worldState.rootHash())) {
-        Witness.error = 2;
+        Witness.error = 4;
         return;
       }
     } catch (Exception e) {
-      Witness.error = 2;
+      Witness.error = 5;
+      Witness.errorMsg = e.getMessage();
       return;
     }
 

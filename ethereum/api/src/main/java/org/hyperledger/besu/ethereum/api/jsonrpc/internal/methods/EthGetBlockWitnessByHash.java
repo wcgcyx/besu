@@ -75,6 +75,7 @@ public class EthGetBlockWitnessByHash implements JsonRpcMethod {
     if (fileName.isPresent()) {
       try (PrintStream out = new PrintStream(new FileOutputStream(fileName.get()))) {
         out.println(Witness.error);
+        out.println(Witness.errorMsg);
         out.println(Witness.data.size());
         out.println(Witness.creationTime.toString());
         out.println(Witness.stateTrieBranchNodes);
