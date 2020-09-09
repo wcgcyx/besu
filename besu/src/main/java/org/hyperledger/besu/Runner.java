@@ -120,7 +120,7 @@ public class Runner implements AutoCloseable {
       LOG.info("Ethereum main loop is up.");
       writeBesuPortsToFile();
       writeBesuNetworksToFile();
-      autoTransactionLogBloomCachingService.ifPresent(AutoTransactionLogBloomCachingService::start);
+//      autoTransactionLogBloomCachingService.ifPresent(AutoTransactionLogBloomCachingService::start);
       writePidFile();
     } catch (final Exception ex) {
       LOG.error("Startup failed", ex);
