@@ -14,6 +14,8 @@
  */
 package org.hyperledger.besu.ethereum.mainnet;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.apache.tuweni.bytes.Bytes;
 import org.apache.tuweni.bytes.Bytes32;
 import org.hyperledger.besu.ethereum.chain.Blockchain;
@@ -42,6 +44,8 @@ import java.util.Set;
 
 public class WitnessGenerator {
 
+  private static final Logger LOG = LogManager.getLogger();
+
   public static void generateWitness(final BlockProcessor blockProcessor, final Blockchain blockchain,
                                         final MutableWorldState worldState, final Block block) {
     Instant timeStart = Instant.now();
@@ -52,11 +56,15 @@ public class WitnessGenerator {
     // Start tracking
     WitnessTracking.startTracking();
 
+    LOG.info("Start processing block.");
+
     // Process block
     if (!blockProcessor.processBlock(blockchain, worldState, block).isSuccessful()) {
       Witness.error = 1;
       return;
     }
+
+    LOG.info("Start generating witness.");
 
     // Obtain tracking result
     Set<Bytes32> loadedNodes = WitnessTracking.getLoadedNodes();
