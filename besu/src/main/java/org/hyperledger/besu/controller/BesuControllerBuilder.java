@@ -343,7 +343,7 @@ public abstract class BesuControllerBuilder {
       WitnessGenerator.generateWitness(
               protocolSchedule.getByBlockNumber(block).getBlockProcessor(),
               blockchain,
-              blockchainQueries.getWorldState(block).get(),
+              blockchainQueries.getWorldState(block - 1).get(),
               blockchain.getBlockByNumber(block).get()
       );
       // Write to file
