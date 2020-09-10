@@ -173,7 +173,7 @@ public class WitnessGenerator {
       StateTrieAccountValue accountValue = StateTrieAccountValue.readFrom(RLP. input(node.getValue().get()));
       Bytes32 codeHash = accountValue.getCodeHash();
       Bytes32 storageHash = accountValue.getStorageRoot();
-      Bytes32 leafPath = node.getLeafPath(prvPath);
+//      Bytes32 leafPath = node.getLeafPath(prvPath);
       boolean isEOA = codeHash.equals(Hash.EMPTY) && storageHash.equals(Hash.EMPTY_TRIE_HASH);
       witness = witness + 1 + 1 + 32 + 32 + 32;
       if (!isEOA) {
