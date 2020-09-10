@@ -15,13 +15,16 @@
 package org.hyperledger.besu.controller;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static org.hyperledger.besu.controller.BesuController.CACHE_PATH;
 
 import org.hyperledger.besu.config.GenesisConfigFile;
 import org.hyperledger.besu.config.GenesisConfigOptions;
 import org.hyperledger.besu.config.experimental.ExperimentalEIPs;
 import org.hyperledger.besu.crypto.NodeKey;
 import org.hyperledger.besu.ethereum.ProtocolContext;
+import org.hyperledger.besu.ethereum.api.jsonrpc.internal.response.JsonRpcSuccessResponse;
 import org.hyperledger.besu.ethereum.api.jsonrpc.methods.JsonRpcMethods;
+import org.hyperledger.besu.ethereum.api.query.BlockchainQueries;
 import org.hyperledger.besu.ethereum.blockcreation.MiningCoordinator;
 import org.hyperledger.besu.ethereum.chain.Blockchain;
 import org.hyperledger.besu.ethereum.chain.GenesisState;
@@ -49,7 +52,10 @@ import org.hyperledger.besu.ethereum.eth.sync.state.SyncState;
 import org.hyperledger.besu.ethereum.eth.transactions.TransactionPool;
 import org.hyperledger.besu.ethereum.eth.transactions.TransactionPoolConfiguration;
 import org.hyperledger.besu.ethereum.eth.transactions.TransactionPoolFactory;
+import org.hyperledger.besu.ethereum.mainnet.BlockProcessor;
 import org.hyperledger.besu.ethereum.mainnet.ProtocolSchedule;
+import org.hyperledger.besu.ethereum.mainnet.Witness;
+import org.hyperledger.besu.ethereum.mainnet.WitnessGenerator;
 import org.hyperledger.besu.ethereum.p2p.config.SubProtocolConfiguration;
 import org.hyperledger.besu.ethereum.storage.StorageProvider;
 import org.hyperledger.besu.ethereum.worldstate.MarkSweepPruner;
@@ -59,6 +65,8 @@ import org.hyperledger.besu.ethereum.worldstate.WorldStateArchive;
 import org.hyperledger.besu.metrics.ObservableMetricsSystem;
 
 import java.io.Closeable;
+import java.io.FileOutputStream;
+import java.io.PrintStream;
 import java.math.BigInteger;
 import java.nio.file.Path;
 import java.time.Clock;
@@ -322,6 +330,49 @@ public abstract class BesuControllerBuilder {
     if (privacyParameters.getPrivateStorageProvider() != null) {
       closeables.add(privacyParameters.getPrivateStorageProvider());
     }
+
+    BlockchainQueries blockchainQueries = new BlockchainQueries(
+            protocolContext.getBlockchain(),
+            protocolContext.getWorldStateArchive());
+//            Optional.of(dataDirectory.resolve(CACHE_PATH)),
+//            Optional.of(ethProtocolManager.ethContext().getScheduler()));
+
+    // Generate witness here.
+    for (int block = 9000000; block <= 9000100; block++) {
+      LOG.info(block);
+      WitnessGenerator.generateWitness(
+              protocolSchedule.getByBlockNumber(block).getBlockProcessor(),
+              blockchain,
+              blockchainQueries.getWorldState(block).get(),
+              blockchain.getBlockByNumber(block).get()
+      );
+      // Write to file
+      try (PrintStream out = new PrintStream(new FileOutputStream("./" + block + ".witness"))) {
+        out.println(Witness.error);
+        out.println(Witness.errorMsg);
+        out.println(Witness.data.size());
+        out.println(Witness.creationTime.toString());
+        out.println(Witness.stateTrieBranchNodes);
+        out.println(Witness.stateTrieExtensionNodes);
+        out.println(Witness.stateTrieHashNodes);
+        out.println(Witness.stateTrieLeafNodes);
+        out.println(Witness.stateTrieHashSize);
+        out.println(Witness.stateTrieLeafSize);
+        out.println(Witness.stateTrieLeafCode);
+        out.println(Witness.storageTrieBranchNodes);
+        out.println(Witness.storageTrieExtensionNodes);
+        out.println(Witness.storageTrieHashNodes);
+        out.println(Witness.storageTrieLeafNodes);
+        out.println(Witness.storageTrieHashsize);
+        out.println(Witness.storageTrieLeafSize);
+        Witness.clear();
+      } catch (Exception e) {
+        System.exit(1);
+      }
+    }
+    LOG.info("Done");
+    System.exit(0);
+
 
     return new BesuController(
         protocolSchedule,
