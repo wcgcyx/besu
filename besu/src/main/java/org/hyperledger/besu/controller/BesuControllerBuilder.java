@@ -367,6 +367,7 @@ public abstract class BesuControllerBuilder {
         out.println(Witness.storageTrieLeafSize);
         Witness.clear();
       } catch (Exception e) {
+        LOG.error(e);
         System.exit(1);
       }
     }
