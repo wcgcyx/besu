@@ -26,8 +26,8 @@ public class Witness {
 
   public static String errorMsg = "";
 
-  // Witness in bytes.
-  public static Bytes data = null;
+  // Witness in size.
+  public static int data = 0;
 
   // Interesting data.
   public static Duration creationTime = null;
@@ -61,7 +61,7 @@ public class Witness {
   public static void clear() {
     error = 0;
     errorMsg = "";
-    data = null;
+    data = 0;
     creationTime = null;
     stateTrieBranchNodes = 0;
     stateTrieExtensionNodes = 0;

@@ -98,9 +98,9 @@ public class WitnessGenerator {
     }
 
     // Generate witness
-    Bytes witness;
+    int witness;
     try {
-      witness = Bytes.concatenate(Bytes.of(0x01, 0x00), generateStateTrieWitness(root, worldStateStorage, accessedCode, accessedStorage, Bytes.EMPTY));
+      witness = 2 + generateStateTrieWitness(root, worldStateStorage, accessedCode, accessedStorage, Bytes.EMPTY);
     } catch (Exception e) {
       Witness.error = 2;
       Witness.errorMsg = " " + e;
@@ -146,36 +146,28 @@ public class WitnessGenerator {
     }
   }
 
-  private static Bytes generateStateTrieWitness(final Node<Bytes> node, final WorldStateStorage worldStateStorage, final Map<Bytes32, Bytes> accessedCode,
-                                                final Map<Bytes32, MerklePatriciaTrie<Bytes32, Bytes>> accessedStorage, final Bytes prvPath) {
-    Bytes witness = Bytes.EMPTY;
+  private static int generateStateTrieWitness(final Node<Bytes> node, final WorldStateStorage worldStateStorage, final Map<Bytes32, Bytes> accessedCode,
+                                                final Map<Bytes32, MerklePatriciaTrie<Bytes32, Bytes>> accessedStorage, final Bytes prvPath) throws Exception {
+    int witness = 0;
     if (node.isHashNode()) {
       Witness.stateTrieHashNodes += 1;
       Witness.stateTrieHashSize += 32;
-      witness = Bytes.concatenate(witness,
-              Bytes.of(0x03),
-              node.getHash());
+      witness = witness + 1 + 32;
     } else if (node.isBranchNode()) {
       Witness.stateTrieBranchNodes += 1;
-      witness = Bytes.concatenate(witness,
-              Bytes.of(0x00),
-              node.getBitMask());
+      witness = witness + 1 + 2;
       List<Node<Bytes>> children = node.getChildren();
       for (int i = 0; i < 16; i++) {
         Node<Bytes> child = children.get(i);
         if (child.isNullNode()) continue;
-        witness = Bytes.concatenate(witness,
-                generateStateTrieWitness(child, worldStateStorage, accessedCode, accessedStorage, Bytes.concatenate(prvPath, Bytes.of(i))));
+        witness = witness + generateStateTrieWitness(child, worldStateStorage, accessedCode, accessedStorage, Bytes.concatenate(prvPath, Bytes.of(i)));
       }
     } else if (node.isExtensionNode()) {
       Witness.stateTrieExtensionNodes += 1;
-      witness = Bytes.concatenate(witness,
-              Bytes.of(0x01),
-              Bytes.of(node.getPath().size()),
-              node.getExtensionPath(),
-              generateStateTrieWitness(node.getChildren().get(0), worldStateStorage, accessedCode, accessedStorage, Bytes.concatenate(prvPath, node.getPath())));
+      witness = witness + 1 + 1 + node.getExtensionPath().size() +
+              generateStateTrieWitness(node.getChildren().get(0), worldStateStorage, accessedCode, accessedStorage, Bytes.concatenate(prvPath, node.getPath()));
     } else if (node.isLeafNode()) {
-      int startPoint = witness.size();
+      int startPoint = witness;
       Witness.stateTrieLeafNodes += 1;
       // TODO: Currently, it uses full leaf path rather than account address.
       StateTrieAccountValue accountValue = StateTrieAccountValue.readFrom(RLP. input(node.getValue().get()));
@@ -183,77 +175,57 @@ public class WitnessGenerator {
       Bytes32 storageHash = accountValue.getStorageRoot();
       Bytes32 leafPath = node.getLeafPath(prvPath);
       boolean isEOA = codeHash.equals(Hash.EMPTY) && storageHash.equals(Hash.EMPTY_TRIE_HASH);
-      witness = Bytes.concatenate(witness,
-              Bytes.of(0x02),
-              Bytes.of(isEOA ? 0x00 : 0x01),
-              leafPath,
-              accountValue.getBalance().toBytes(),
-              Bytes32.leftPad(Bytes.ofUnsignedLong(accountValue.getNonce())));
+      witness = witness + 1 + 1 + 32 + 32 + 32;
       if (!isEOA) {
         // Add code
         Bytes code = worldStateStorage.getCode(codeHash).orElse(Bytes.EMPTY);
         boolean codeAccessed = accessedCode.containsKey(codeHash);
         if (codeAccessed) Witness.stateTrieLeafCode += code.size();
-        witness = Bytes.concatenate(witness,
-                Bytes.of(codeAccessed ? 0x00 : 0x01),
-                Bytes.ofUnsignedInt(code.size()),
-                codeAccessed ? code : codeHash);
+        witness = witness + 1 + 4 + (codeAccessed ? code.size() : 32);
         // Add storage
         boolean storageAccessed = accessedStorage.containsKey(storageHash);
-        witness = Bytes.concatenate(witness,
-                storageAccessed ? generateStorageTrieWitness(accessedStorage.get(storageHash).getRoot(), Bytes.EMPTY) :
-                        Bytes.concatenate(Bytes.of(0x03), storageHash));
+        witness = witness + (storageAccessed ? generateStorageTrieWitness(accessedStorage.get(storageHash).getRoot(), Bytes.EMPTY) :
+                33);
       }
-      Witness.stateTrieLeafSize += (witness.size() - startPoint);
+      Witness.stateTrieLeafSize += witness - startPoint;
     } else {
       // This should never happen
       Witness.errorMsg += "-1-";
-      return null;
+      throw new NullPointerException();
     }
     return witness;
   }
 
-  private static Bytes generateStorageTrieWitness(final Node<Bytes> node, final Bytes prvPath) {
-    Bytes witness = Bytes.EMPTY;
+  private static int generateStorageTrieWitness(final Node<Bytes> node, final Bytes prvPath) throws Exception {
+    int witness = 0;
     if (node.isHashNode() || node.isNullNode()) {
       Witness.storageTrieHashNodes += 1;
       Witness.storageTrieHashsize += 32;
       // This is a storage hash node or null node
       // TODO: Currently, it does not care for RLP
-      witness = Bytes.concatenate(witness,
-              Bytes.of(0x03),
-              node.getHash());
+      witness = witness + 33;
     } else if (node.isBranchNode()) {
       Witness.storageTrieBranchNodes += 1;
-      witness = Bytes.concatenate(witness,
-              Bytes.of(0x00),
-              node.getBitMask());
+      witness = witness + 1 + 2;
       List<Node<Bytes>> children = node.getChildren();
       for (int i = 0; i < 16; i++) {
         Node<Bytes> child = children.get(i);
         if (child.isNullNode()) continue;
-        witness = Bytes.concatenate(witness,
-                generateStorageTrieWitness(child, Bytes.concatenate(prvPath, Bytes.of(i))));
+        witness = witness + generateStorageTrieWitness(child, Bytes.concatenate(prvPath, Bytes.of(i)));
       }
     } else if (node.isExtensionNode()) {
       Witness.storageTrieExtensionNodes += 1;
-      witness = Bytes.concatenate(witness,
-              Bytes.of(0x01),
-              Bytes.of(node.getPath().size()),
-              node.getExtensionPath(),
-              generateStorageTrieWitness(node.getChildren().get(0), Bytes.concatenate(prvPath, node.getPath())));
+      witness = witness + 1 + 1 + node.getExtensionPath().size() +
+              generateStorageTrieWitness(node.getChildren().get(0), Bytes.concatenate(prvPath, node.getPath()));
     } else if (node.isLeafNode()) {
       Witness.storageTrieLeafNodes += 1;
-      int startPoint = witness.size();
-      witness = Bytes.concatenate(witness,
-              Bytes.of(0x02),
-              node.getLeafPath(prvPath),
-              RLP.input(node.getValue().get()).readUInt256Scalar().toBytes());
-      Witness.storageTrieLeafSize += (witness.size() - startPoint);
+      int startPoint = witness;
+      witness = witness + 1 + 32 + 32;
+      Witness.storageTrieLeafSize += (witness - startPoint);
     } else {
       // This should never happen
       Witness.errorMsg += "-2-";
-      return null;
+      throw new NullPointerException();
     }
     return witness;
   }
