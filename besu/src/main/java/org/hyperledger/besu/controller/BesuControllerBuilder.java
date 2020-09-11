@@ -528,7 +528,7 @@ public abstract class BesuControllerBuilder {
     }
   }
 
-  private class Witness {
+  private static class Witness {
 
     public Duration creationTime;
     public int size;
