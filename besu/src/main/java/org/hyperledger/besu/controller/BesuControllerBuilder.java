@@ -437,6 +437,7 @@ public abstract class BesuControllerBuilder {
     WorldStateStorage worldStateStorage = initialWorldState.getWorldStateStorage();
     Node<Bytes> root = initialWorldState.getAccountStateTrie().getRoot();
 
+    witness.size += 2;
     generateStateTrieWitness(root, worldStateStorage, loadedNodes, loadedCode, loadedStorage, witness);
 
     witness.creationTime = Duration.between(timeStart, Instant.now());
