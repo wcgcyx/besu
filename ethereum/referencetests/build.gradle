@@ -27,6 +27,7 @@ dependencies {
   implementation project(':config')
   implementation project(':crypto')
   implementation project(':ethereum:core')
+  implementation project(':ethereum:trie')
   implementation project(path: ':ethereum:core', configuration: 'testSupportArtifacts')
   implementation project(':ethereum:rlp')
   implementation project(':services:kvstore')
