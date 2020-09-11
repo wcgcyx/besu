@@ -16,18 +16,23 @@ package org.hyperledger.besu.controller;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import org.apache.tuweni.bytes.Bytes;
+import org.apache.tuweni.bytes.Bytes32;
 import org.hyperledger.besu.config.GenesisConfigFile;
 import org.hyperledger.besu.config.GenesisConfigOptions;
 import org.hyperledger.besu.config.experimental.ExperimentalEIPs;
 import org.hyperledger.besu.crypto.NodeKey;
 import org.hyperledger.besu.ethereum.ProtocolContext;
 import org.hyperledger.besu.ethereum.api.jsonrpc.methods.JsonRpcMethods;
+import org.hyperledger.besu.ethereum.api.query.BlockchainQueries;
 import org.hyperledger.besu.ethereum.blockcreation.MiningCoordinator;
 import org.hyperledger.besu.ethereum.chain.Blockchain;
 import org.hyperledger.besu.ethereum.chain.GenesisState;
 import org.hyperledger.besu.ethereum.chain.MutableBlockchain;
+import org.hyperledger.besu.ethereum.core.Block;
 import org.hyperledger.besu.ethereum.core.Hash;
 import org.hyperledger.besu.ethereum.core.MiningParameters;
+import org.hyperledger.besu.ethereum.core.MutableWorldState;
 import org.hyperledger.besu.ethereum.core.PrivacyParameters;
 import org.hyperledger.besu.ethereum.core.Synchronizer;
 import org.hyperledger.besu.ethereum.core.fees.EIP1559;
@@ -49,25 +54,38 @@ import org.hyperledger.besu.ethereum.eth.sync.state.SyncState;
 import org.hyperledger.besu.ethereum.eth.transactions.TransactionPool;
 import org.hyperledger.besu.ethereum.eth.transactions.TransactionPoolConfiguration;
 import org.hyperledger.besu.ethereum.eth.transactions.TransactionPoolFactory;
+import org.hyperledger.besu.ethereum.mainnet.BlockProcessor;
 import org.hyperledger.besu.ethereum.mainnet.ProtocolSchedule;
 import org.hyperledger.besu.ethereum.p2p.config.SubProtocolConfiguration;
+import org.hyperledger.besu.ethereum.rlp.RLP;
 import org.hyperledger.besu.ethereum.storage.StorageProvider;
+import org.hyperledger.besu.ethereum.trie.Node;
+import org.hyperledger.besu.ethereum.trie.StoredMerklePatriciaTrie;
+import org.hyperledger.besu.ethereum.trie.WitnessTracking;
 import org.hyperledger.besu.ethereum.worldstate.MarkSweepPruner;
 import org.hyperledger.besu.ethereum.worldstate.Pruner;
 import org.hyperledger.besu.ethereum.worldstate.PrunerConfiguration;
+import org.hyperledger.besu.ethereum.worldstate.StateTrieAccountValue;
 import org.hyperledger.besu.ethereum.worldstate.WorldStateArchive;
+import org.hyperledger.besu.ethereum.worldstate.WorldStateStorage;
 import org.hyperledger.besu.metrics.ObservableMetricsSystem;
 
 import java.io.Closeable;
+import java.io.FileOutputStream;
+import java.io.PrintStream;
 import java.math.BigInteger;
 import java.nio.file.Path;
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.Set;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -330,6 +348,45 @@ public abstract class BesuControllerBuilder {
       closeables.add(privacyParameters.getPrivateStorageProvider());
     }
 
+    // Generate witness directly
+    BlockchainQueries blockchainQueries = new BlockchainQueries(
+            protocolContext.getBlockchain(),
+            protocolContext.getWorldStateArchive()
+    );
+
+    for (int block = 9000000; block <= 10000000; block++) {
+      Witness witness = new Witness();
+      LOG.info(block);
+      generateWitness(
+              protocolSchedule.getByBlockNumber(block).getBlockProcessor(),
+              blockchain,
+              blockchainQueries.getWorldState(block - 1).get(),
+              blockchain.getBlockByNumber(block).get(),
+              witness);
+      try (PrintStream out = new PrintStream(new FileOutputStream("./" + block + ".witness"))) {
+        out.println(witness.creationTime.toString());
+        out.println(witness.size);
+        out.println(witness.stateTrieBranchNodes);
+        out.println(witness.stateTrieExtensionNodes);
+        out.println(witness.stateTrieHashNodes);
+        out.println(witness.stateTrieLeafNodes);
+        out.println(witness.stateTrieHashSize);
+        out.println(witness.stateTrieLeafSize);
+        out.println(witness.stateTrieLeafCode);
+        out.println(witness.storageTrieBranchNodes);
+        out.println(witness.storageTrieExtensionNodes);
+        out.println(witness.storageTrieHashNodes);
+        out.println(witness.storageTrieLeafNodes);
+        out.println(witness.storageTrieHashSize);
+        out.println(witness.storageTrieLeafSize);
+      } catch (Exception e) {
+        LOG.error(e);
+        System.exit(1);
+      }
+    }
+    LOG.info("All Done!");
+    System.exit(0);
+
     return new BesuController(
         protocolSchedule,
         protocolContext,
@@ -346,6 +403,166 @@ public abstract class BesuControllerBuilder {
         nodeKey,
         closeables,
         additionalPluginServices);
+  }
+
+  private static void generateWitness(final BlockProcessor blockProcessor, final Blockchain blockchain,
+                                      final MutableWorldState worldState, final Block block,
+                                      final Witness witness) {
+    Instant timeStart = Instant.now();
+
+    // Get a copy of the initial world state
+    MutableWorldState initialWorldState = worldState.copy();
+
+    // Start tracking
+    WitnessTracking.startTracking();
+
+    LOG.info("Start processing block...");
+
+    if (!blockProcessor.processBlock(blockchain, worldState, block).isSuccessful()) {
+      LOG.error("Processing block failed.");
+      System.exit(1);
+    }
+
+    LOG.info("Start generating witness...");
+
+    // Obtain tracking result
+    Set<Bytes32> loadedNodes = WitnessTracking.getLoadedNodes();
+    Set<Bytes32> loadedCode = WitnessTracking.getLoadedCode();
+    Set<Bytes32> loadedStorage = WitnessTracking.getLoadedStorage();
+
+    // Stop tracking
+    WitnessTracking.stopTracking();
+
+    // Get storage and root
+    WorldStateStorage worldStateStorage = initialWorldState.getWorldStateStorage();
+    Node<Bytes> root = initialWorldState.getAccountStateTrie().getRoot();
+
+    generateStateTrieWitness(root, worldStateStorage, loadedNodes, loadedCode, loadedStorage, witness);
+
+    witness.creationTime = Duration.between(timeStart, Instant.now());
+
+    LOG.info("Done.\n");
+  }
+
+  private static void generateStateTrieWitness(final Node<Bytes> node, final WorldStateStorage worldStateStorage, final Set<Bytes32> loadedNodes, final Set<Bytes32> loadedCode, final Set<Bytes32> loadedStorage, final Witness witness) {
+    if (node.isHashNode()) {
+      // First try to load
+      if (loadedNodes.contains(node.getHash())) {
+        node.load();
+        generateStateTrieWitness(node, worldStateStorage, loadedNodes, loadedCode, loadedStorage, witness);
+      } else {
+        witness.stateTrieHashNodes += 1;
+        witness.stateTrieHashSize += 32;
+        witness.size += 33;
+      }
+    } else if (node.isBranchNode()) {
+      witness.stateTrieBranchNodes += 1;
+      witness.size += 3;
+      for (Node<Bytes> child : node.getChildren()) {
+        if (child.isNullNode()) continue;
+        generateStateTrieWitness(child, worldStateStorage, loadedNodes, loadedCode, loadedStorage, witness);
+      }
+    } else if (node.isExtensionNode()) {
+      witness.stateTrieExtensionNodes += 1;
+      witness.size += 2 + node.getExtensionPath().size();
+      generateStateTrieWitness(node.getChildren().get(0), worldStateStorage, loadedNodes, loadedCode, loadedStorage, witness);
+    } else if (node.isLeafNode()) {
+      int startSize = witness.size;
+      witness.stateTrieLeafNodes += 1;
+      StateTrieAccountValue accountValue = StateTrieAccountValue.readFrom(RLP.input(node.getValue().get()));
+      Bytes32 codeHash = accountValue.getCodeHash();
+      Bytes32 storageHash = accountValue.getStorageRoot();
+      boolean isEOA = codeHash.equals(Hash.EMPTY) && storageHash.equals(Hash.EMPTY_TRIE_HASH);
+      witness.size += 98;
+      if (!isEOA) {
+        Bytes code = worldStateStorage.getCode(codeHash).orElse(Bytes.EMPTY);
+        if (loadedCode.contains(codeHash)) {
+          witness.size += 5 + code.size();
+          witness.stateTrieLeafCode += code.size();
+        } else {
+          witness.size += 37;
+        }
+        if (loadedStorage.contains(storageHash)) {
+          Node<Bytes> storageRoot = new StoredMerklePatriciaTrie<>(
+                  worldStateStorage::getAccountStateTrieNode, storageHash, b -> b, b -> b).getRoot();
+          generateStorageTrieWitness(storageRoot, loadedNodes, witness);
+        } else {
+          witness.size += 33;
+        }
+      }
+      witness.stateTrieLeafSize += witness.size - startSize;
+    } else {
+      LOG.error("State trie scan failed.");
+      System.exit(1);
+    }
+  }
+
+  private static void generateStorageTrieWitness(final Node<Bytes> node, final Set<Bytes32> loadedNodes, final Witness witness) {
+    if (node.isHashNode() || node.isNullNode()) {
+      if (node.isHashNode() && loadedNodes.contains(node.getHash())) {
+        node.load();
+        generateStorageTrieWitness(node, loadedNodes, witness);
+      } else {
+        witness.storageTrieHashNodes += 1;
+        witness.storageTrieHashSize += 32;
+        witness.size += 33;
+      }
+    } else if (node.isBranchNode()) {
+      witness.storageTrieBranchNodes += 1;
+      witness.size += 3;
+      for (Node<Bytes> child : node.getChildren()) {
+        if (child.isNullNode()) continue;
+        generateStorageTrieWitness(child, loadedNodes, witness);
+      }
+    } else if (node.isExtensionNode()) {
+      witness.storageTrieExtensionNodes += 1;
+      witness.size += 2 + node.getExtensionPath().size();
+      generateStorageTrieWitness(node.getChildren().get(0), loadedNodes, witness);
+    } else if (node.isLeafNode()) {
+      witness.storageTrieLeafNodes += 1;
+      witness.storageTrieLeafSize += 65;
+      witness.size += 65;
+    } else {
+      LOG.error("Storage trie scan failed.");
+      System.exit(1);
+    }
+  }
+
+  private class Witness {
+
+    public Duration creationTime;
+    public int size;
+    public int stateTrieBranchNodes;
+    public int stateTrieExtensionNodes;
+    public int stateTrieHashNodes;
+    public int stateTrieLeafNodes;
+    public int stateTrieHashSize;
+    public int stateTrieLeafSize;
+    public int stateTrieLeafCode;
+    public int storageTrieBranchNodes;
+    public int storageTrieExtensionNodes;
+    public int storageTrieHashNodes;
+    public int storageTrieLeafNodes;
+    public int storageTrieHashSize;
+    public int storageTrieLeafSize;
+
+    public Witness() {
+      creationTime = null;
+      size = 0;
+      stateTrieBranchNodes = 0;
+      stateTrieExtensionNodes = 0;
+      stateTrieHashNodes = 0;
+      stateTrieLeafNodes = 0;
+      stateTrieHashSize = 0;
+      stateTrieLeafSize = 0;
+      stateTrieLeafCode = 0;
+      storageTrieBranchNodes = 0;
+      storageTrieExtensionNodes = 0;
+      storageTrieHashNodes = 0;
+      storageTrieLeafNodes = 0;
+      storageTrieHashSize = 0;
+      storageTrieLeafSize = 0;
+    }
   }
 
   protected void prepForBuild() {}

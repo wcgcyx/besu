@@ -90,4 +90,6 @@ public interface MerklePatriciaTrie<K, V> {
   void visitAll(Consumer<Node<V>> visitor);
 
   void visitLeafs(final TrieIterator.LeafHandler<V> handler);
+
+  default Node<V> getRoot() { return null; }
 }

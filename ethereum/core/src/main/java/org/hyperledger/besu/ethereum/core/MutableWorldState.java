@@ -14,6 +14,11 @@
  */
 package org.hyperledger.besu.ethereum.core;
 
+import org.apache.tuweni.bytes.Bytes;
+import org.apache.tuweni.bytes.Bytes32;
+import org.hyperledger.besu.ethereum.trie.MerklePatriciaTrie;
+import org.hyperledger.besu.ethereum.worldstate.WorldStateStorage;
+
 public interface MutableWorldState extends WorldState, MutableWorldView {
 
   /**
@@ -25,4 +30,8 @@ public interface MutableWorldState extends WorldState, MutableWorldView {
 
   /** Persist accumulated changes to underlying storage. */
   void persist();
+
+  default MerklePatriciaTrie<Bytes32, Bytes> getAccountStateTrie() { return null; }
+
+  default WorldStateStorage getWorldStateStorage() { return null; }
 }
