@@ -364,10 +364,14 @@ public abstract class BesuControllerBuilder {
               blockchainQueries.getWorldState(block - 1).get(),
               blockchain.getBlockByNumber(block).get(),
               witness);
-      File test = new File("./" + (block - 1) + ".witness");
-      if (test.exists()) {
-        LOG.error("Last file hasn't been processed by script yet.");
-        System.exit(1);
+      while (new File("./" + (block - 1) + ".witness").exists()) {
+        LOG.info("Waiting for file to be processed by script...");
+        try {
+          Thread.sleep(1000);
+        } catch (Exception e) {
+          LOG.error("Sleep failed.");
+          System.exit(1);
+        }
       }
       try (PrintStream out = new PrintStream(new FileOutputStream("./" + block + ".witness"))) {
         out.println(witness.creationTime.toString());
