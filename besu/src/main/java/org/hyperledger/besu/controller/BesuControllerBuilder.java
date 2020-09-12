@@ -71,6 +71,7 @@ import org.hyperledger.besu.ethereum.worldstate.WorldStateStorage;
 import org.hyperledger.besu.metrics.ObservableMetricsSystem;
 
 import java.io.Closeable;
+import java.io.File;
 import java.io.FileOutputStream;
 import java.io.PrintStream;
 import java.math.BigInteger;
@@ -363,6 +364,11 @@ public abstract class BesuControllerBuilder {
               blockchainQueries.getWorldState(block - 1).get(),
               blockchain.getBlockByNumber(block).get(),
               witness);
+      File test = new File("./" + (block - 1) + ".witness");
+      if (test.exists()) {
+        LOG.error("Last file hasn't been processed by script yet.");
+        System.exit(1);
+      }
       try (PrintStream out = new PrintStream(new FileOutputStream("./" + block + ".witness"))) {
         out.println(witness.creationTime.toString());
         out.println(witness.size);
