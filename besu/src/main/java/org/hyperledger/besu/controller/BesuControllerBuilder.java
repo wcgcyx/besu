@@ -357,7 +357,7 @@ public abstract class BesuControllerBuilder {
         }
       }
       Block block = blockchain.getBlockByNumber(blockNumber).get();
-      if (!save_block_compact(block, String.format("block/%d.block", blockNumber))) {
+      if (!save_block_compact(block, String.format("block/%d.block.gz", blockNumber))) {
         System.exit(1);
       }
       count++;
