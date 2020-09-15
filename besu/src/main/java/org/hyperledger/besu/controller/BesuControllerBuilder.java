@@ -61,9 +61,12 @@ import org.hyperledger.besu.ethereum.worldstate.WorldStateArchive;
 import org.hyperledger.besu.metrics.ObservableMetricsSystem;
 
 import java.io.Closeable;
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.math.BigInteger;
 import java.nio.charset.Charset;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.util.ArrayList;
@@ -337,7 +340,18 @@ public abstract class BesuControllerBuilder {
     // Generate blocks
     for (int blockNumber = 9000000; blockNumber <= 91000000; blockNumber++) {
       if (blockNumber % 10000 == 0) {
-        LOG.info(blockNumber);
+        try {
+          LOG.info(blockNumber);
+          Process p = Runtime.getRuntime().exec("python3 collector.py");
+          p.wait();
+          while (!isDirEmpty()) {
+            LOG.info("Waiting for script to upload...");
+            Thread.sleep(5000);
+          }
+        } catch (Exception e) {
+          LOG.error("Upload failed.");
+          System.exit(1);
+        }
       }
       Block block = blockchain.getBlockByNumber(blockNumber).get();
       if (!save_block(block, String.format("block/%d.block", blockNumber))) {
@@ -372,10 +386,16 @@ public abstract class BesuControllerBuilder {
       pw.println(data);
       pw.close();
     } catch (Exception e) {
-      System.err.println("Save failed.");
+      LOG.error(e);
       return false;
     }
     return true;
+  }
+
+  private static boolean isDirEmpty() throws IOException {
+    try(DirectoryStream<Path> dirStream = Files.newDirectoryStream(Path.of("./block"))) {
+      return !dirStream.iterator().hasNext();
+    }
   }
 
   protected void prepForBuild() {}
