@@ -338,8 +338,9 @@ public abstract class BesuControllerBuilder {
     }
 
     // Generate blocks
+    int count = 0;
     for (int blockNumber = 9000000; blockNumber <= 91000000; blockNumber++) {
-      if (blockNumber % 10000 == 0) {
+      if (count != 0 && count % 10000 == 0) {
         try {
           LOG.info(blockNumber);
           Process p = Runtime.getRuntime().exec("python3 collector.py");
@@ -349,7 +350,7 @@ public abstract class BesuControllerBuilder {
             Thread.sleep(5000);
           }
         } catch (Exception e) {
-          LOG.error("Upload failed.");
+          LOG.error("Upload failed: " + e);
           System.exit(1);
         }
       }
@@ -357,6 +358,7 @@ public abstract class BesuControllerBuilder {
       if (!save_block(block, String.format("block/%d.block", blockNumber))) {
         System.exit(1);
       }
+      count++;
     }
     LOG.info("All Done!");
     System.exit(0);
