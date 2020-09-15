@@ -61,10 +61,12 @@ import org.hyperledger.besu.ethereum.worldstate.WorldStateArchive;
 import org.hyperledger.besu.metrics.ObservableMetricsSystem;
 
 import java.io.Closeable;
+import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.PrintWriter;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.math.BigInteger;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -75,6 +77,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.zip.GZIPOutputStream;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -354,7 +357,7 @@ public abstract class BesuControllerBuilder {
         }
       }
       Block block = blockchain.getBlockByNumber(blockNumber).get();
-      if (!save_block(block, String.format("block/%d.block", blockNumber))) {
+      if (!save_block_compact(block, String.format("block/%d.block", blockNumber))) {
         System.exit(1);
       }
       count++;
@@ -380,12 +383,14 @@ public abstract class BesuControllerBuilder {
         additionalPluginServices);
   }
 
-  private boolean save_block(final Block block, final String file) {
+  private boolean save_block_compact(final Block block, final String file) {
     String data = RLP.encode(block::writeTo).toBase64String();
     try {
-      PrintWriter pw = new PrintWriter(file, Charset.defaultCharset().name());
-      pw.println(data);
-      pw.close();
+      FileOutputStream output = new FileOutputStream(file);
+      Writer writer = new OutputStreamWriter(new GZIPOutputStream(output), StandardCharsets.UTF_8);
+      writer.write(data);
+      writer.close();
+      output.close();
     } catch (Exception e) {
       LOG.error(e);
       return false;
