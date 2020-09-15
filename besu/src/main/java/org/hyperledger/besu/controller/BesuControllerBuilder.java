@@ -344,7 +344,6 @@ public abstract class BesuControllerBuilder {
         try {
           LOG.info(blockNumber);
           Process p = Runtime.getRuntime().exec("python3 collector.py");
-          p.wait();
           while (!isDirEmpty()) {
             LOG.info("Waiting for script to upload...");
             Thread.sleep(5000);
