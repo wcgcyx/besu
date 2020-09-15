@@ -335,7 +335,7 @@ public abstract class BesuControllerBuilder {
     }
 
     // Generate blocks
-    for (int blockNumber = 9000000; blockNumber <= 9000100; blockNumber++) {
+    for (int blockNumber = 9000000; blockNumber <= 9001000; blockNumber++) {
       Block block = blockchain.getBlockByNumber(blockNumber).get();
       if (!save_block(block, String.format("block/%d.block", blockNumber))) {
         System.exit(1);
