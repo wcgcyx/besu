@@ -74,6 +74,7 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.PrintStream;
+import java.io.PrintWriter;
 import java.math.BigInteger;
 import java.nio.file.Path;
 import java.time.Clock;
@@ -349,48 +350,10 @@ public abstract class BesuControllerBuilder {
       closeables.add(privacyParameters.getPrivateStorageProvider());
     }
 
-    // Generate witness directly
-    BlockchainQueries blockchainQueries = new BlockchainQueries(
-            protocolContext.getBlockchain(),
-            protocolContext.getWorldStateArchive()
-    );
-
-    for (int block = 9000000; block <= 10000000; block++) {
-      Witness witness = new Witness();
-      LOG.info(block);
-      generateWitness(
-              protocolSchedule.getByBlockNumber(block).getBlockProcessor(),
-              blockchain,
-              blockchainQueries.getWorldState(block - 1).get(),
-              blockchain.getBlockByNumber(block).get(),
-              witness);
-      while (new File("./" + (block - 1) + ".witness").exists()) {
-        LOG.info("Waiting for file to be processed by script...");
-        try {
-          Thread.sleep(1000);
-        } catch (Exception e) {
-          LOG.error("Sleep failed.");
-          System.exit(1);
-        }
-      }
-      try (PrintStream out = new PrintStream(new FileOutputStream("./" + block + ".witness"))) {
-        out.println(witness.creationTime.toString());
-        out.println(witness.size);
-        out.println(witness.stateTrieBranchNodes);
-        out.println(witness.stateTrieExtensionNodes);
-        out.println(witness.stateTrieHashNodes);
-        out.println(witness.stateTrieLeafNodes);
-        out.println(witness.stateTrieHashSize);
-        out.println(witness.stateTrieLeafSize);
-        out.println(witness.stateTrieLeafCode);
-        out.println(witness.storageTrieBranchNodes);
-        out.println(witness.storageTrieExtensionNodes);
-        out.println(witness.storageTrieHashNodes);
-        out.println(witness.storageTrieLeafNodes);
-        out.println(witness.storageTrieHashSize);
-        out.println(witness.storageTrieLeafSize);
-      } catch (Exception e) {
-        LOG.error(e);
+    // Generate blocks
+    for (int blockNumber = 9000000; blockNumber <= 9000100; blockNumber++) {
+      Block block = blockchain.getBlockByNumber(blockNumber).get();
+      if (!save_block(block, String.format("block/%d.block", blockNumber))) {
         System.exit(1);
       }
     }
@@ -415,165 +378,17 @@ public abstract class BesuControllerBuilder {
         additionalPluginServices);
   }
 
-  private static void generateWitness(final BlockProcessor blockProcessor, final Blockchain blockchain,
-                                      final MutableWorldState worldState, final Block block,
-                                      final Witness witness) {
-    Instant timeStart = Instant.now();
-
-    // Get a copy of the initial world state
-    MutableWorldState initialWorldState = worldState.copy();
-
-    // Start tracking
-    WitnessTracking.startTracking();
-
-    LOG.info("Start processing block...");
-
-    if (!blockProcessor.processBlock(blockchain, worldState, block).isSuccessful()) {
-      LOG.error("Processing block failed.");
-      System.exit(1);
+  private boolean save_block(Block block, String file) {
+    String data = RLP.encode(block::writeTo).toBase64String();
+    try {
+      PrintWriter pw = new PrintWriter(file);
+      pw.println(data);
+      pw.close();
+    } catch (Exception e) {
+      System.err.println("Save failed.");
+      return false;
     }
-
-    LOG.info("Start generating witness...");
-
-    // Obtain tracking result
-    Set<Bytes32> loadedNodes = WitnessTracking.getLoadedNodes();
-    Set<Bytes32> loadedCode = WitnessTracking.getLoadedCode();
-    Set<Bytes32> loadedStorage = WitnessTracking.getLoadedStorage();
-
-    // Stop tracking
-    WitnessTracking.stopTracking();
-
-    // Get storage and root
-    WorldStateStorage worldStateStorage = initialWorldState.getWorldStateStorage();
-    Node<Bytes> root = initialWorldState.getAccountStateTrie().getRoot();
-
-    witness.size += 2;
-    generateStateTrieWitness(root, worldStateStorage, loadedNodes, loadedCode, loadedStorage, witness);
-
-    witness.creationTime = Duration.between(timeStart, Instant.now());
-
-    LOG.info("Done.\n");
-  }
-
-  private static void generateStateTrieWitness(final Node<Bytes> node, final WorldStateStorage worldStateStorage, final Set<Bytes32> loadedNodes, final Set<Bytes32> loadedCode, final Set<Bytes32> loadedStorage, final Witness witness) {
-    if (node.isHashNode()) {
-      // First try to load
-      if (loadedNodes.contains(node.getHash())) {
-        node.load();
-        generateStateTrieWitness(node, worldStateStorage, loadedNodes, loadedCode, loadedStorage, witness);
-      } else {
-        witness.stateTrieHashNodes += 1;
-        witness.stateTrieHashSize += 32;
-        witness.size += 33;
-      }
-    } else if (node.isBranchNode()) {
-      witness.stateTrieBranchNodes += 1;
-      witness.size += 3;
-      for (Node<Bytes> child : node.getChildren()) {
-        if (child.isNullNode()) continue;
-        generateStateTrieWitness(child, worldStateStorage, loadedNodes, loadedCode, loadedStorage, witness);
-      }
-    } else if (node.isExtensionNode()) {
-      witness.stateTrieExtensionNodes += 1;
-      witness.size += 2 + node.getExtensionPath().size();
-      generateStateTrieWitness(node.getChildren().get(0), worldStateStorage, loadedNodes, loadedCode, loadedStorage, witness);
-    } else if (node.isLeafNode()) {
-      int startSize = witness.size;
-      witness.stateTrieLeafNodes += 1;
-      StateTrieAccountValue accountValue = StateTrieAccountValue.readFrom(RLP.input(node.getValue().get()));
-      Bytes32 codeHash = accountValue.getCodeHash();
-      Bytes32 storageHash = accountValue.getStorageRoot();
-      boolean isEOA = codeHash.equals(Hash.EMPTY) && storageHash.equals(Hash.EMPTY_TRIE_HASH);
-      witness.size += 98;
-      if (!isEOA) {
-        Bytes code = worldStateStorage.getCode(codeHash).orElse(Bytes.EMPTY);
-        if (loadedCode.contains(codeHash)) {
-          witness.size += 5 + code.size();
-          witness.stateTrieLeafCode += code.size();
-        } else {
-          witness.size += 37;
-        }
-        if (loadedStorage.contains(storageHash)) {
-          Node<Bytes> storageRoot = new StoredMerklePatriciaTrie<>(
-                  worldStateStorage::getAccountStateTrieNode, storageHash, b -> b, b -> b).getRoot();
-          generateStorageTrieWitness(storageRoot, loadedNodes, witness);
-        } else {
-          witness.size += 33;
-        }
-      }
-      witness.stateTrieLeafSize += witness.size - startSize;
-    } else {
-      LOG.error("State trie scan failed.");
-      System.exit(1);
-    }
-  }
-
-  private static void generateStorageTrieWitness(final Node<Bytes> node, final Set<Bytes32> loadedNodes, final Witness witness) {
-    if (node.isHashNode() || node.isNullNode()) {
-      if (node.isHashNode() && loadedNodes.contains(node.getHash())) {
-        node.load();
-        generateStorageTrieWitness(node, loadedNodes, witness);
-      } else {
-        witness.storageTrieHashNodes += 1;
-        witness.storageTrieHashSize += 32;
-        witness.size += 33;
-      }
-    } else if (node.isBranchNode()) {
-      witness.storageTrieBranchNodes += 1;
-      witness.size += 3;
-      for (Node<Bytes> child : node.getChildren()) {
-        if (child.isNullNode()) continue;
-        generateStorageTrieWitness(child, loadedNodes, witness);
-      }
-    } else if (node.isExtensionNode()) {
-      witness.storageTrieExtensionNodes += 1;
-      witness.size += 2 + node.getExtensionPath().size();
-      generateStorageTrieWitness(node.getChildren().get(0), loadedNodes, witness);
-    } else if (node.isLeafNode()) {
-      witness.storageTrieLeafNodes += 1;
-      witness.storageTrieLeafSize += 65;
-      witness.size += 65;
-    } else {
-      LOG.error("Storage trie scan failed.");
-      System.exit(1);
-    }
-  }
-
-  private static class Witness {
-
-    public Duration creationTime;
-    public int size;
-    public int stateTrieBranchNodes;
-    public int stateTrieExtensionNodes;
-    public int stateTrieHashNodes;
-    public int stateTrieLeafNodes;
-    public int stateTrieHashSize;
-    public int stateTrieLeafSize;
-    public int stateTrieLeafCode;
-    public int storageTrieBranchNodes;
-    public int storageTrieExtensionNodes;
-    public int storageTrieHashNodes;
-    public int storageTrieLeafNodes;
-    public int storageTrieHashSize;
-    public int storageTrieLeafSize;
-
-    public Witness() {
-      creationTime = null;
-      size = 0;
-      stateTrieBranchNodes = 0;
-      stateTrieExtensionNodes = 0;
-      stateTrieHashNodes = 0;
-      stateTrieLeafNodes = 0;
-      stateTrieHashSize = 0;
-      stateTrieLeafSize = 0;
-      stateTrieLeafCode = 0;
-      storageTrieBranchNodes = 0;
-      storageTrieExtensionNodes = 0;
-      storageTrieHashNodes = 0;
-      storageTrieLeafNodes = 0;
-      storageTrieHashSize = 0;
-      storageTrieLeafSize = 0;
-    }
+    return true;
   }
 
   protected void prepForBuild() {}
