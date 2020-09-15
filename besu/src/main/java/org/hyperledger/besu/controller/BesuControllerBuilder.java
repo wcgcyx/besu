@@ -342,14 +342,14 @@ public abstract class BesuControllerBuilder {
 
     // Generate blocks
     int count = 0;
-    for (int blockNumber = 9000000; blockNumber <= 91000000; blockNumber++) {
+    for (int blockNumber = 9000001; blockNumber <= 90100000; blockNumber++) {
       if (count != 0 && count % 10000 == 0) {
         try {
           LOG.info(blockNumber);
-          Runtime.getRuntime().exec("python3 collector.py");
+          Runtime.getRuntime().exec(String.format("python3 collector.py block%d.zip", blockNumber));
           while (!isDirEmpty()) {
             LOG.info("Waiting for script to upload...");
-            Thread.sleep(5000);
+            Thread.sleep(1000);
           }
         } catch (Exception e) {
           LOG.error("Upload failed: " + e);
