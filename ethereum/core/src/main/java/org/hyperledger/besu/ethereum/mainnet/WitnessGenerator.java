@@ -44,14 +44,16 @@ public class WitnessGenerator {
                                         final MutableWorldState worldState, final Block block) {
     // Get a copy of the initial world state
     MutableWorldState initialWorldState = worldState.copy();
+    Bytes stateRootBeforeBlockExecution = worldState.rootHash();
 
     // Start tracking
     WitnessTracking.startTracking();
 
     // Process block
     if (!blockProcessor.processBlock(blockchain, worldState, block).isSuccessful()) {
-      return new Witness(1, Bytes.EMPTY);
+      return new Witness(1, Bytes.EMPTY, stateRootBeforeBlockExecution, Bytes.EMPTY, Bytes.EMPTY, Bytes.EMPTY);
     }
+    Bytes stateRootAfterBlockExecution = worldState.rootHash();
 
     // Obtain tracking result
     Set<Bytes32> loadedNodes = WitnessTracking.getLoadedNodes();
@@ -89,7 +91,7 @@ public class WitnessGenerator {
     try {
       witness = Bytes.concatenate(Bytes.of(0x01, 0x00), generateStateTrieWitness(root, worldStateStorage, accessedCode, accessedStorage, Bytes.EMPTY));
     } catch (Exception e) {
-      return new Witness(1, Bytes.EMPTY);
+      return new Witness(1, Bytes.EMPTY, stateRootBeforeBlockExecution, stateRootAfterBlockExecution, Bytes.EMPTY, Bytes.EMPTY);
     }
 
     // Verify witness
@@ -98,17 +100,18 @@ public class WitnessGenerator {
       Map<Bytes32, MerklePatriciaTrie<Bytes32, Bytes>> accessedStorageVerify = new HashMap<>();
       Pair<Node<Bytes>, Integer> res = getStateTrieNode(witness, 2, Bytes.EMPTY, accessedCodeVerify, accessedStorageVerify);
       MutableWorldState worldStateVerify = new InMemoryMutableWorldState(new SimpleMerklePatriciaTrie<>(b -> b, res.l), accessedCodeVerify, accessedStorageVerify);
+      Bytes stateRootFromWitness = worldStateVerify.rootHash();
       if (!blockProcessor.processBlock(blockchain, worldStateVerify, block).isSuccessful()) {
-        return new Witness(2, Bytes.EMPTY);
+        return new Witness(2, witness, stateRootBeforeBlockExecution, stateRootAfterBlockExecution, stateRootFromWitness, Bytes.EMPTY);
       }
+      Bytes stateRootAfterWitnessConsumption = worldStateVerify.rootHash();
       if (!worldStateVerify.rootHash().equals(worldState.rootHash())) {
-        return new Witness(2, Bytes.EMPTY);
+        return new Witness(2, witness, stateRootBeforeBlockExecution, stateRootAfterBlockExecution, stateRootFromWitness, stateRootAfterWitnessConsumption);
       }
+      return new Witness(0, witness, stateRootBeforeBlockExecution, stateRootAfterBlockExecution, stateRootFromWitness, stateRootAfterWitnessConsumption);
     } catch (Exception e) {
-      return new Witness(2, Bytes.EMPTY);
+      return new Witness(2, witness, stateRootBeforeBlockExecution, stateRootAfterBlockExecution, Bytes.EMPTY, Bytes.EMPTY);
     }
-
-    return new Witness(0, witness);
   }
 
   private static void loadFromNode(final Node<Bytes> node, final Set<Bytes32> loadedNodes) {

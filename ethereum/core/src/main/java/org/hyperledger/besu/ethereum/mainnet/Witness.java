@@ -18,7 +18,14 @@ import com.fasterxml.jackson.annotation.JsonGetter;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import org.apache.tuweni.bytes.Bytes;
 
-@JsonPropertyOrder({"data", "error"})
+@JsonPropertyOrder({
+        "error",
+        "data",
+        "stateRootBeforeWitnessGeneration",
+        "stateRootAfterWitnessGeneration",
+        "stateRootFromWitness",
+        "stateRootAfterWitnessConsumption"
+})
 public class Witness {
 
   // Error code is 0 if nothing goes wrong,
@@ -29,9 +36,35 @@ public class Witness {
   // Witness in bytes.
   public Bytes data;
 
-  public Witness(final int error, final Bytes data) {
+  // State Trie Root before executing the given block.
+  public Bytes stateRootBeforeBlockExecution;
+
+  // State Trie Root after executing the given block.
+  public Bytes stateRootAfterBlockExecution;
+
+  // State Trie Root constructed from the witness generated.
+  public Bytes stateRootFromWitness;
+
+  // State Trie Root after consuming the given witness.
+  public Bytes stateRootAfterWitnessConsumption;
+
+  public Witness(final int error,
+                 final Bytes data,
+                 final Bytes stateRootBeforeBlockExecution,
+                 final Bytes stateRootAfterBlockExecution,
+                 final Bytes stateRootFromWitness,
+                 final Bytes stateRootAfterWitnessConsumption) {
     this.error = error;
     this.data = data;
+    this.stateRootBeforeBlockExecution = stateRootBeforeBlockExecution;
+    this.stateRootAfterBlockExecution = stateRootAfterBlockExecution;
+    this.stateRootFromWitness = stateRootFromWitness;
+    this.stateRootAfterWitnessConsumption = stateRootAfterWitnessConsumption;
+  }
+
+  @JsonGetter(value = "error")
+  public int getError() {
+    return error;
   }
 
   @JsonGetter(value = "data")
@@ -39,8 +72,23 @@ public class Witness {
     return data.toHexString();
   }
 
-  @JsonGetter(value = "error")
-  public int getError() {
-    return error;
+  @JsonGetter(value = "stateRootBeforeBlockExecution")
+  public String getStateRootBeforeBlockExecution() {
+    return stateRootBeforeBlockExecution.toHexString();
+  }
+
+  @JsonGetter(value = "stateRootAfterBlockExecution")
+  public String getStateRootAfterBlockExecution() {
+    return stateRootAfterBlockExecution.toHexString();
+  }
+
+  @JsonGetter(value = "stateRootFromWitness")
+  public String getStateRootFromWitness() {
+    return stateRootFromWitness.toHexString();
+  }
+
+  @JsonGetter(value = "stateRootAfterWitnessConsumption")
+  public String getStateRootAfterWitnessConsumption() {
+    return stateRootAfterWitnessConsumption.toHexString();
   }
 }
