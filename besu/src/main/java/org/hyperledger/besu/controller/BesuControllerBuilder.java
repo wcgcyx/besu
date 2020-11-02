@@ -15,6 +15,7 @@
 package org.hyperledger.besu.controller;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 import org.hyperledger.besu.config.GenesisConfigFile;
 import org.hyperledger.besu.config.GenesisConfigOptions;
@@ -22,6 +23,7 @@ import org.hyperledger.besu.config.experimental.ExperimentalEIPs;
 import org.hyperledger.besu.crypto.NodeKey;
 import org.hyperledger.besu.ethereum.ProtocolContext;
 import org.hyperledger.besu.ethereum.api.jsonrpc.methods.JsonRpcMethods;
+import org.hyperledger.besu.ethereum.api.query.BlockchainQueries;
 import org.hyperledger.besu.ethereum.blockcreation.MiningCoordinator;
 import org.hyperledger.besu.ethereum.chain.Blockchain;
 import org.hyperledger.besu.ethereum.chain.GenesisState;
@@ -50,6 +52,8 @@ import org.hyperledger.besu.ethereum.eth.transactions.TransactionPool;
 import org.hyperledger.besu.ethereum.eth.transactions.TransactionPoolConfiguration;
 import org.hyperledger.besu.ethereum.eth.transactions.TransactionPoolFactory;
 import org.hyperledger.besu.ethereum.mainnet.ProtocolSchedule;
+import org.hyperledger.besu.ethereum.mainnet.Witness;
+import org.hyperledger.besu.ethereum.mainnet.WitnessGenerator;
 import org.hyperledger.besu.ethereum.p2p.config.SubProtocolConfiguration;
 import org.hyperledger.besu.ethereum.storage.StorageProvider;
 import org.hyperledger.besu.ethereum.worldstate.MarkSweepPruner;
@@ -59,6 +63,7 @@ import org.hyperledger.besu.ethereum.worldstate.WorldStateArchive;
 import org.hyperledger.besu.metrics.ObservableMetricsSystem;
 
 import java.io.Closeable;
+import java.io.FileWriter;
 import java.math.BigInteger;
 import java.nio.file.Path;
 import java.time.Clock;
@@ -322,6 +327,33 @@ public abstract class BesuControllerBuilder {
     if (privacyParameters.getPrivateStorageProvider() != null) {
       closeables.add(privacyParameters.getPrivateStorageProvider());
     }
+
+    BlockchainQueries blockchainQueries = new BlockchainQueries(
+            protocolContext.getBlockchain(),
+            protocolContext.getWorldStateArchive());
+//            Optional.of(dataDirectory.resolve(CACHE_PATH)),
+//            Optional.of(ethProtocolManager.ethContext().getScheduler()));
+
+    // Generate witness here.
+    for (int block = 9000000; block <= 9000100; block++) {
+      LOG.info(block);
+      Witness witness = WitnessGenerator.generateWitness(
+              protocolSchedule.getByBlockNumber(block).getBlockProcessor(),
+              blockchain,
+              blockchainQueries.getWorldState(block - 1).get(),
+              blockchain.getBlockByNumber(block).get()
+      );
+      // Write to file
+      try {
+        FileWriter fw = new FileWriter("./data.csv",UTF_8,true);
+        fw.write(String.format("%d,%s\n", block, witness.validationTime.toString()));
+      } catch (Exception e) {
+        LOG.error(e);
+        System.exit(1);
+      }
+    }
+    LOG.info("Done");
+    System.exit(0);
 
     return new BesuController(
         protocolSchedule,

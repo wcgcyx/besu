@@ -32,6 +32,8 @@ import org.hyperledger.besu.ethereum.worldstate.InMemoryMutableWorldState;
 import org.hyperledger.besu.ethereum.worldstate.StateTrieAccountValue;
 import org.hyperledger.besu.ethereum.worldstate.WorldStateStorage;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -51,7 +53,7 @@ public class WitnessGenerator {
 
     // Process block
     if (!blockProcessor.processBlock(blockchain, worldState, block).isSuccessful()) {
-      return new Witness(1, Bytes.EMPTY, stateRootBeforeBlockExecution, Bytes.EMPTY, Bytes.EMPTY, Bytes.EMPTY);
+      return new Witness(1, Bytes.EMPTY, stateRootBeforeBlockExecution, Bytes.EMPTY, Bytes.EMPTY, Bytes.EMPTY, Duration.ZERO);
     }
     Bytes stateRootAfterBlockExecution = worldState.rootHash();
 
@@ -91,10 +93,13 @@ public class WitnessGenerator {
     try {
       witness = Bytes.concatenate(Bytes.of(0x01, 0x00), generateStateTrieWitness(root, worldStateStorage, accessedCode, accessedStorage, Bytes.EMPTY));
     } catch (Exception e) {
-      return new Witness(1, Bytes.EMPTY, stateRootBeforeBlockExecution, stateRootAfterBlockExecution, Bytes.EMPTY, Bytes.EMPTY);
+      return new Witness(1, Bytes.EMPTY, stateRootBeforeBlockExecution, stateRootAfterBlockExecution, Bytes.EMPTY, Bytes.EMPTY, Duration.ZERO);
     }
 
+
     // Verify witness
+    Instant timeStart = Instant.now();
+
     try {
       Map<Bytes32, Bytes> accessedCodeVerify = new HashMap<>();
       Map<Bytes32, MerklePatriciaTrie<Bytes32, Bytes>> accessedStorageVerify = new HashMap<>();
@@ -102,15 +107,15 @@ public class WitnessGenerator {
       MutableWorldState worldStateVerify = new InMemoryMutableWorldState(new SimpleMerklePatriciaTrie<>(b -> b, res.l), accessedCodeVerify, accessedStorageVerify);
       Bytes stateRootFromWitness = worldStateVerify.rootHash();
       if (!blockProcessor.processBlock(blockchain, worldStateVerify, block).isSuccessful()) {
-        return new Witness(2, witness, stateRootBeforeBlockExecution, stateRootAfterBlockExecution, stateRootFromWitness, Bytes.EMPTY);
+        return new Witness(2, witness, stateRootBeforeBlockExecution, stateRootAfterBlockExecution, stateRootFromWitness, Bytes.EMPTY, Duration.ZERO);
       }
       Bytes stateRootAfterWitnessConsumption = worldStateVerify.rootHash();
       if (!worldStateVerify.rootHash().equals(worldState.rootHash())) {
-        return new Witness(2, witness, stateRootBeforeBlockExecution, stateRootAfterBlockExecution, stateRootFromWitness, stateRootAfterWitnessConsumption);
+        return new Witness(2, witness, stateRootBeforeBlockExecution, stateRootAfterBlockExecution, stateRootFromWitness, stateRootAfterWitnessConsumption, Duration.ZERO);
       }
-      return new Witness(0, witness, stateRootBeforeBlockExecution, stateRootAfterBlockExecution, stateRootFromWitness, stateRootAfterWitnessConsumption);
+      return new Witness(0, witness, stateRootBeforeBlockExecution, stateRootAfterBlockExecution, stateRootFromWitness, stateRootAfterWitnessConsumption, Duration.between(timeStart, Instant.now()));
     } catch (Exception e) {
-      return new Witness(2, witness, stateRootBeforeBlockExecution, stateRootAfterBlockExecution, Bytes.EMPTY, Bytes.EMPTY);
+      return new Witness(2, witness, stateRootBeforeBlockExecution, stateRootAfterBlockExecution, Bytes.EMPTY, Bytes.EMPTY, Duration.ZERO);
     }
   }
 

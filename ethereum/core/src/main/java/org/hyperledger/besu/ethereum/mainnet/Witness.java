@@ -18,6 +18,8 @@ import com.fasterxml.jackson.annotation.JsonGetter;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import org.apache.tuweni.bytes.Bytes;
 
+import java.time.Duration;
+
 @JsonPropertyOrder({
         "error",
         "data",
@@ -48,18 +50,22 @@ public class Witness {
   // State Trie Root after consuming the given witness.
   public Bytes stateRootAfterWitnessConsumption;
 
+  public Duration validationTime;
+
   public Witness(final int error,
                  final Bytes data,
                  final Bytes stateRootBeforeBlockExecution,
                  final Bytes stateRootAfterBlockExecution,
                  final Bytes stateRootFromWitness,
-                 final Bytes stateRootAfterWitnessConsumption) {
+                 final Bytes stateRootAfterWitnessConsumption,
+                 final Duration validationTime) {
     this.error = error;
     this.data = data;
     this.stateRootBeforeBlockExecution = stateRootBeforeBlockExecution;
     this.stateRootAfterBlockExecution = stateRootAfterBlockExecution;
     this.stateRootFromWitness = stateRootFromWitness;
     this.stateRootAfterWitnessConsumption = stateRootAfterWitnessConsumption;
+    this.validationTime = validationTime;
   }
 
   @JsonGetter(value = "error")
