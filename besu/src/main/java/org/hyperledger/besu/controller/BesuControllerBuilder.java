@@ -21,6 +21,8 @@ import org.hyperledger.besu.config.GenesisConfigFile;
 import org.hyperledger.besu.config.GenesisConfigOptions;
 import org.hyperledger.besu.config.experimental.ExperimentalEIPs;
 import org.hyperledger.besu.crypto.NodeKey;
+import org.hyperledger.besu.ethereum.BlockValidator;
+import org.hyperledger.besu.ethereum.MainnetBlockValidator;
 import org.hyperledger.besu.ethereum.ProtocolContext;
 import org.hyperledger.besu.ethereum.api.jsonrpc.methods.JsonRpcMethods;
 import org.hyperledger.besu.ethereum.api.query.BlockchainQueries;
@@ -28,6 +30,7 @@ import org.hyperledger.besu.ethereum.blockcreation.MiningCoordinator;
 import org.hyperledger.besu.ethereum.chain.Blockchain;
 import org.hyperledger.besu.ethereum.chain.GenesisState;
 import org.hyperledger.besu.ethereum.chain.MutableBlockchain;
+import org.hyperledger.besu.ethereum.core.Block;
 import org.hyperledger.besu.ethereum.core.Hash;
 import org.hyperledger.besu.ethereum.core.MiningParameters;
 import org.hyperledger.besu.ethereum.core.PrivacyParameters;
@@ -51,6 +54,9 @@ import org.hyperledger.besu.ethereum.eth.sync.state.SyncState;
 import org.hyperledger.besu.ethereum.eth.transactions.TransactionPool;
 import org.hyperledger.besu.ethereum.eth.transactions.TransactionPoolConfiguration;
 import org.hyperledger.besu.ethereum.eth.transactions.TransactionPoolFactory;
+import org.hyperledger.besu.ethereum.mainnet.BlockHeaderValidator;
+import org.hyperledger.besu.ethereum.mainnet.HeaderValidationMode;
+import org.hyperledger.besu.ethereum.mainnet.MainnetBlockHeaderValidator;
 import org.hyperledger.besu.ethereum.mainnet.ProtocolSchedule;
 import org.hyperledger.besu.ethereum.mainnet.Witness;
 import org.hyperledger.besu.ethereum.mainnet.WitnessGenerator;
@@ -67,6 +73,8 @@ import java.io.FileWriter;
 import java.math.BigInteger;
 import java.nio.file.Path;
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -335,18 +343,19 @@ public abstract class BesuControllerBuilder {
 //            Optional.of(ethProtocolManager.ethContext().getScheduler()));
 
     // Generate witness here.
-    for (int block = 9000000; block <= 9000100; block++) {
+    BlockHeaderValidator validator = MainnetBlockHeaderValidator.create().build();
+
+    Block parent = blockchain.getBlockByNumber(8999999).get();
+    for (int block = 9000000; block <= 9030000; block++) {
+      Block current = blockchain.getBlockByNumber(block).get();
       LOG.info(block);
-      Witness witness = WitnessGenerator.generateWitness(
-              protocolSchedule.getByBlockNumber(block).getBlockProcessor(),
-              blockchain,
-              blockchainQueries.getWorldState(block - 1).get(),
-              blockchain.getBlockByNumber(block).get()
-      );
+      Instant timeStart = Instant.now();
+      validator.validateHeader(current.getHeader(), parent.getHeader(), protocolContext, HeaderValidationMode.FULL);
+      Duration time = Duration.between(timeStart, Instant.now());
       // Write to file
       try {
-        FileWriter fw = new FileWriter("./data.csv",UTF_8,true);
-        fw.write(String.format("%d,%s\n", block, witness.validationTime.toString()));
+        FileWriter fw = new FileWriter("./data-block-header-validation.csv",UTF_8,true);
+        fw.write(String.format("%d,%s\n", block, time.toString()));
       } catch (Exception e) {
         LOG.error(e);
         System.exit(1);
