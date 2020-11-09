@@ -336,11 +336,11 @@ public abstract class BesuControllerBuilder {
       closeables.add(privacyParameters.getPrivateStorageProvider());
     }
 
-    BlockchainQueries blockchainQueries = new BlockchainQueries(
-            protocolContext.getBlockchain(),
-            protocolContext.getWorldStateArchive());
-//            Optional.of(dataDirectory.resolve(CACHE_PATH)),
-//            Optional.of(ethProtocolManager.ethContext().getScheduler()));
+//    BlockchainQueries blockchainQueries = new BlockchainQueries(
+//            protocolContext.getBlockchain(),
+//            protocolContext.getWorldStateArchive());
+////            Optional.of(dataDirectory.resolve(CACHE_PATH)),
+////            Optional.of(ethProtocolManager.ethContext().getScheduler()));
 
     // Generate witness here.
     BlockHeaderValidator validator = MainnetBlockHeaderValidator.create().build();
